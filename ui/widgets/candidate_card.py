@@ -160,7 +160,38 @@ class CandidateCard(QFrame):
         self.eval_badge.setText(cand.eval_str)
 
         # Style based on rank with Liquid Glass + Neon styling
-        if cand.rank == 1:
+        if getattr(cand, "is_brilliant", False):
+            self.setStyleSheet("""
+                QFrame#CandidateCard {
+                    background-color: rgba(0, 240, 255, 0.12);
+                    border: 1.5px solid #00F0FF;
+                    border-radius: 12px;
+                }
+            """)
+            self.rank_badge.setText("!! BRILLIANT")
+            self.rank_badge.setStyleSheet("""
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00F0FF, stop:1 #00FF9D);
+                color: #080B12;
+                border: 1px solid #00F0FF;
+                border-radius: 6px;
+                padding: 1px 7px;
+                font-size: 10px;
+                font-weight: 900;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
+            """)
+            self.eval_badge.setStyleSheet("""
+                background-color: rgba(0, 240, 255, 0.25);
+                color: #00F0FF;
+                border: 1px solid #00F0FF;
+                border-radius: 6px;
+                padding: 2px 7px;
+                font-size: 11px;
+                font-weight: 800;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
+            """)
+            self.delta_label.setText("Sacrifice !!")
+            self.delta_label.setStyleSheet("color: #00FF9D; font-size: 10px; font-weight: 800; font-family: 'JetBrains Mono', 'Consolas', monospace;")
+        elif cand.rank == 1:
             self.setStyleSheet("""
                 QFrame#CandidateCard {
                     background-color: rgba(0, 240, 255, 0.06);
@@ -254,7 +285,10 @@ class CandidateCard(QFrame):
             self.delta_label.setText(f"{cand.eval_diff:+.2f} cp" if cand.eval_diff is not None else "")
             self.delta_label.setStyleSheet("color: #FFB800; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
 
-        self.explanation_label.setText(cand.short_explanation or "Engine evaluated candidate continuation.")
+        if getattr(cand, "is_brilliant", False) and getattr(cand, "brilliant_reason", ""):
+            self.explanation_label.setText(f"💎 {cand.brilliant_reason}")
+        else:
+            self.explanation_label.setText(cand.short_explanation or "Engine evaluated candidate continuation.")
         
         details = []
         if cand.strategic_idea:

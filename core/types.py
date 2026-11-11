@@ -41,6 +41,8 @@ class CandidateMove:
     risks_and_responses: str = ""
     tactical_motifs: List[str] = field(default_factory=list)
     is_best: bool = False
+    is_brilliant: bool = False
+    brilliant_reason: str = ""
 
 @dataclass
 class PositionSummary:

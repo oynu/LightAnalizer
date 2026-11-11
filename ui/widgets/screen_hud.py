@@ -151,7 +151,10 @@ class ScreenBoardOverlay(QWidget):
         cands = self._candidate_moves[:3]
         for idx in reversed(range(len(cands))):
             cand = cands[idx]
-            color = base_colors[idx]
+            if getattr(cand, "is_brilliant", False):
+                color = QColor("#00FF9D")
+            else:
+                color = base_colors[idx]
             scale = 1.15 if idx == 0 else 0.95
             self._draw_neon_arrow(
                 painter,
@@ -301,7 +304,8 @@ class ScreenBoardOverlay(QWidget):
         ty = by + (r2 * sq_size) + (sq_size / 2.0)
 
         # Position badge just above or below target square
-        badge_w = max(90.0, sq_size * 1.25)
+        is_brill = getattr(cand, "is_brilliant", False)
+        badge_w = max(115.0 if is_brill else 90.0, sq_size * (1.45 if is_brill else 1.25))
         badge_h = 24.0
         badge_x = tx - (badge_w / 2.0)
         badge_y = ty - (sq_size * 0.55) - badge_h
@@ -312,16 +316,17 @@ class ScreenBoardOverlay(QWidget):
 
         painter.save()
         # Glass pill backing
-        painter.setPen(QPen(QColor(0, 240, 255, 180), 1.2))
-        painter.setBrush(QBrush(QColor(10, 14, 24, 215)))
+        border_col = QColor(0, 255, 157, 230) if is_brill else QColor(0, 240, 255, 180)
+        painter.setPen(QPen(border_col, 1.4 if is_brill else 1.2))
+        painter.setBrush(QBrush(QColor(10, 14, 24, 225)))
         painter.drawRoundedRect(badge_rect, 12, 12)
 
-        # Text: "★ BEST: Nf3  +0.4"
+        # Text: "💎 !!: Bxh7+ +2.4" or "★ Nf3 +0.4"
         font = QFont("JetBrains Mono", 10, QFont.Bold)
         font.setStyleHint(QFont.Monospace)
         painter.setFont(font)
 
-        text = f"★ {cand.san}  {cand.eval_str}"
-        painter.setPen(QColor("#00F0FF"))
+        text = f"💎 !! {cand.san}  {cand.eval_str}" if is_brill else f"★ {cand.san}  {cand.eval_str}"
+        painter.setPen(QColor("#00FF9D") if is_brill else QColor("#00F0FF"))
         painter.drawText(badge_rect, Qt.AlignCenter, text)
         painter.restore()

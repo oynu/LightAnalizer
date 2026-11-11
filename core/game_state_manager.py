@@ -15,6 +15,7 @@ from core.types import (
 from core.board_state import BoardState
 from core.engine_manager import EngineManager
 from core.analyzer import ChessAnalyzer
+from core.brilliant_farmer import BrilliantFarmer
 
 class GameStateManager(QObject):
     """
@@ -56,6 +57,10 @@ class GameStateManager(QObject):
         self._latest_candidates: List[CandidateMove] = []
         self._latest_summary: Optional[PositionSummary] = None
 
+        # Brilliant Farmer Mode
+        self.brilliant_farmer = BrilliantFarmer()
+        self._brilliant_mode = False
+
         # Mode: Live Tracking vs User Exploring Variation
         self._is_exploring_variation = False
 
@@ -93,6 +98,26 @@ class GameStateManager(QObject):
     def toggle_orientation(self) -> bool:
         new_val = not self._orientation_white_bottom
         self.set_orientation(new_val)
+        return new_val
+
+    @property
+    def brilliant_mode(self) -> bool:
+        return self._brilliant_mode
+
+    def set_brilliant_mode(self, enabled: bool) -> None:
+        self._brilliant_mode = enabled
+        if self._latest_candidates:
+            if enabled:
+                self._latest_candidates = self.brilliant_farmer.process_candidates(
+                    self.board_state.board, list(self._latest_candidates)
+                )
+            else:
+                self._latest_candidates.sort(key=lambda c: c.rank)
+            self._notify()
+
+    def toggle_brilliant_mode(self) -> bool:
+        new_val = not self._brilliant_mode
+        self.set_brilliant_mode(new_val)
         return new_val
 
     @property
@@ -375,6 +400,9 @@ class GameStateManager(QObject):
         # Strict version and FEN verification: discard stale results
         if fen != self.board_state.board.fen():
             return  # Discard obsolete engine analysis
+
+        if self._brilliant_mode:
+            candidates = self.brilliant_farmer.process_candidates(self.board_state.board, candidates)
 
         self._latest_candidates = candidates
         self._latest_summary = self.analyzer.analyze_position(self.board_state.board, candidates)

@@ -750,6 +750,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("M"), self, self.toggle_mini_board)
         QShortcut(QKeySequence("B"), self, self.open_board_selector)
         QShortcut(QKeySequence("O"), self, self.toggle_screen_overlay)
+        QShortcut(QKeySequence("Alt+B"), self, self.view_analysis._on_toggle_brilliant_mode)
         QShortcut(QKeySequence("D"), self, self._toggle_diagnostics)
         QShortcut(QKeySequence("F9"), self, self._on_flag_wrong_move)
         QShortcut(QKeySequence(Qt.Key_Backspace), self, self._on_undo_last_ply)

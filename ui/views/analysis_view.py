@@ -34,6 +34,7 @@ class AnalysisView(QWidget):
         self.game_state_mgr = game_state_mgr
         self.mode_mgr = mode_mgr
         self._screen_hud_active = False
+        self._brilliant_mode_active = False
 
         self._setup_ui()
         self._connect_signals()
@@ -142,6 +143,12 @@ class AnalysisView(QWidget):
         self.btn_screen_hud.setStyleSheet(btn_style)
         self.btn_screen_hud.clicked.connect(self._on_toggle_screen_hud)
         ctrl_row.addWidget(self.btn_screen_hud)
+
+        self.btn_brilliant_mode = QPushButton("💎 Brilliant Mode")
+        self.btn_brilliant_mode.setToolTip("Farms brilliant (!!) sacrifice moves leading to favorable positions (Alt+B)")
+        self.btn_brilliant_mode.setStyleSheet(btn_style)
+        self.btn_brilliant_mode.clicked.connect(self._on_toggle_brilliant_mode)
+        ctrl_row.addWidget(self.btn_brilliant_mode)
 
         ctrl_row.addStretch()
         board_layout.addWidget(self.ctrl_row_widget)
@@ -340,6 +347,48 @@ class AnalysisView(QWidget):
                 }
             """)
 
+    def _on_toggle_brilliant_mode(self) -> None:
+        active = self.game_state_mgr.toggle_brilliant_mode()
+        self.set_brilliant_mode_active(active)
+
+    def set_brilliant_mode_active(self, active: bool) -> None:
+        self._brilliant_mode_active = active
+        if active:
+            self.btn_brilliant_mode.setText("💎 Brilliant: ON")
+            self.btn_brilliant_mode.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 240, 255, 0.22);
+                    color: #00F0FF;
+                    border: 1px solid #00F0FF;
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 800;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 240, 255, 0.35);
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_brilliant_mode.setText("💎 Brilliant Mode")
+            self.btn_brilliant_mode.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 240, 255, 0.14);
+                    border-color: rgba(0, 240, 255, 0.35);
+                    color: #00F0FF;
+                }
+            """)
+
     def _on_candidate_hovered(self, rank: int) -> None:
         self.board_widget.set_highlighted_candidate_rank(rank if rank > 0 else None)
 
@@ -452,6 +501,9 @@ class AnalysisView(QWidget):
             self.board_widget.set_candidate_moves([])
             return
 
+        if hasattr(self.game_state_mgr, "brilliant_mode") and self.game_state_mgr.brilliant_mode != self._brilliant_mode_active:
+            self.set_brilliant_mode_active(self.game_state_mgr.brilliant_mode)
+
         if turn == chess.WHITE:
             turn_name = "WHITE TO MOVE"
             badge_color = "#00F0FF"  # Electric Cyan
@@ -467,7 +519,12 @@ class AnalysisView(QWidget):
 
         if candidates:
             best = candidates[0]
-            if is_player_turn:
+            if getattr(best, "is_brilliant", False):
+                badge_title = f"● 💎 BRILLIANT SACRIFICE (!!) ➔ PLAY: {best.san} ({best.eval_str})"
+                badge_color = "#00F0FF"
+                bg_color = "rgba(0, 240, 255, 0.14)"
+                border_color = "rgba(0, 240, 255, 0.60)"
+            elif is_player_turn:
                 badge_title = f"● YOUR TURN [{turn_name}]{check_str}  ➔  PLAY: {best.san} ({best.eval_str})"
             else:
                 badge_title = f"● OPPONENT'S TURN [{turn_name}]{check_str}  ➔  EXPECT: {best.san} ({best.eval_str})"
@@ -489,7 +546,9 @@ class AnalysisView(QWidget):
             }}
         """)
 
-        if summary and summary.coach_takeaway:
+        if candidates and getattr(candidates[0], "is_brilliant", False):
+            self.coach_text.setText(f"💎 Brilliant Sacrifice: {candidates[0].brilliant_reason}")
+        elif summary and summary.coach_takeaway:
             self.coach_text.setText(summary.coach_takeaway)
         elif candidates:
             best = candidates[0]
