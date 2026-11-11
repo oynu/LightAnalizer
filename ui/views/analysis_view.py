@@ -23,6 +23,8 @@ class AnalysisView(QWidget):
     Focused live analysis workspace with high-visibility board and clear candidate move recommendations.
     """
     screen_hud_requested = Signal()
+    play_move_requested = Signal()
+    auto_click_toggled = Signal(bool)
 
     def __init__(
         self,
@@ -35,6 +37,7 @@ class AnalysisView(QWidget):
         self.mode_mgr = mode_mgr
         self._screen_hud_active = False
         self._brilliant_mode_active = False
+        self._auto_click_active = False
 
         self._setup_ui()
         self._connect_signals()
@@ -165,6 +168,18 @@ class AnalysisView(QWidget):
             }
         """)
         ctrl_row.addWidget(self.lbl_brilliant_counter)
+
+        self.btn_play_move = QPushButton("▶ Move (Space)")
+        self.btn_play_move.setToolTip("Click piece and move it directly on your screen client (Space)")
+        self.btn_play_move.setStyleSheet(btn_style)
+        self.btn_play_move.clicked.connect(self._on_play_move_clicked)
+        ctrl_row.addWidget(self.btn_play_move)
+
+        self.btn_auto_click = QPushButton("🖱 Auto: OFF")
+        self.btn_auto_click.setToolTip("Toggle automatic mouse clicks on your turn (Alt+M)")
+        self.btn_auto_click.setStyleSheet(btn_style)
+        self.btn_auto_click.clicked.connect(self._on_toggle_auto_click)
+        ctrl_row.addWidget(self.btn_auto_click)
 
         ctrl_row.addStretch()
         board_layout.addWidget(self.ctrl_row_widget)
@@ -390,6 +405,52 @@ class AnalysisView(QWidget):
         else:
             self.btn_brilliant_mode.setText("💎 Brilliant Mode")
             self.btn_brilliant_mode.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 240, 255, 0.14);
+                    border-color: rgba(0, 240, 255, 0.35);
+                    color: #00F0FF;
+                }
+            """)
+
+    def _on_play_move_clicked(self) -> None:
+        self.play_move_requested.emit()
+
+    def _on_toggle_auto_click(self) -> None:
+        self._auto_click_active = not self._auto_click_active
+        self.set_auto_click_active(self._auto_click_active)
+        self.auto_click_toggled.emit(self._auto_click_active)
+
+    def set_auto_click_active(self, active: bool) -> None:
+        self._auto_click_active = active
+        if active:
+            self.btn_auto_click.setText("🖱 Auto: ON")
+            self.btn_auto_click.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 255, 157, 0.20);
+                    color: #00FF9D;
+                    border: 1px solid #00FF9D;
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 800;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 255, 157, 0.32);
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_auto_click.setText("🖱 Auto: OFF")
+            self.btn_auto_click.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(255, 255, 255, 0.05);
                     color: #94A3B8;

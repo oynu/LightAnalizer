@@ -22,6 +22,7 @@ from core.vision.observer import BoardObserver
 from core.vision.moves_tab_observer import MovesTabObserver
 from core.vision.screen_overlay import BoardSelectionOverlay
 from core.review import GameReviewer
+from core.mouse_controller import MouseMoveController
 
 from ui.styles import DARK_THEME_QSS
 from ui.views.analysis_view import AnalysisView
@@ -64,6 +65,7 @@ class MainWindow(QMainWindow):
         self._active_overlay: Optional[BoardSelectionOverlay] = None
         self._diagnostics_visible = False
         self.screen_overlay = ScreenBoardOverlay()
+        self.mouse_controller = MouseMoveController()
         self._activate_overlay_after_calibration = False
 
         self._setup_ui()
@@ -751,6 +753,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("B"), self, self.open_board_selector)
         QShortcut(QKeySequence("O"), self, self.toggle_screen_overlay)
         QShortcut(QKeySequence("Alt+B"), self, self.view_analysis._on_toggle_brilliant_mode)
+        QShortcut(QKeySequence("Alt+M"), self, self.view_analysis._on_toggle_auto_click)
+        QShortcut(QKeySequence(Qt.Key_Space), self, self.play_best_move_on_screen)
         QShortcut(QKeySequence("D"), self, self._toggle_diagnostics)
         QShortcut(QKeySequence("F9"), self, self._on_flag_wrong_move)
         QShortcut(QKeySequence(Qt.Key_Backspace), self, self._on_undo_last_ply)
@@ -790,6 +794,8 @@ class MainWindow(QMainWindow):
         self.game_state_mgr.orientation_changed.connect(self._on_orientation_changed)
         self.game_state_mgr.add_diagnostics_listener(self.diagnostics_panel.update_diagnostics)
         self.view_analysis.screen_hud_requested.connect(self.toggle_screen_overlay)
+        self.view_analysis.play_move_requested.connect(self.play_best_move_on_screen)
+        self.view_analysis.auto_click_toggled.connect(self._on_auto_click_toggled)
         self._on_game_state_changed()
 
     def _on_orientation_changed(self, white_bottom: bool) -> None:
@@ -860,6 +866,51 @@ class MainWindow(QMainWindow):
             self.sync_pill.setStyleSheet("background-color: rgba(255, 255, 255, 0.04); color: #94A3B8; border-left: 3px solid #64748B; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
 
         self._sync_screen_overlay()
+        self._try_auto_click_turn()
+
+    def play_best_move_on_screen(self) -> bool:
+        """Executes the top engine/brilliant move on the client chessboard via physical mouse clicks."""
+        cal = getattr(self.observer, "calibration", None)
+        if not cal or not cal.is_calibrated:
+            self.sync_pill.setText("⚠️ Select board first")
+            return False
+        cands = self.game_state_mgr.candidates
+        if not cands:
+            return False
+        best_cand = cands[0]
+        self.sync_pill.setText(f"🖱 Moving: {best_cand.san}...")
+        return self.mouse_controller.execute_move_async(
+            cal,
+            best_cand.move,
+            on_complete=self._on_screen_move_completed
+        )
+
+    def _on_screen_move_completed(self, success: bool) -> None:
+        if success:
+            self.sync_pill.setText("✓ Move played on screen")
+            QTimer.singleShot(1500, self._on_game_state_changed)
+
+    def _on_auto_click_toggled(self, active: bool) -> None:
+        self.mouse_controller.auto_click_enabled = active
+        if active:
+            self.sync_pill.setText("🖱 Auto-Click ON")
+            self._try_auto_click_turn()
+
+    def _try_auto_click_turn(self) -> None:
+        if not getattr(self, "mouse_controller", None) or not self.mouse_controller.auto_click_enabled:
+            return
+        if self.mouse_controller.is_executing:
+            return
+        cal = getattr(self.observer, "calibration", None)
+        if not cal or not cal.is_calibrated:
+            return
+        cands = self.game_state_mgr.candidates
+        if not cands:
+            return
+        board = self.game_state_mgr.current_board
+        player_color = getattr(self.game_state_mgr, "player_color", chess.WHITE)
+        if board.turn == player_color:
+            QTimer.singleShot(400, self.play_best_move_on_screen)
 
     def _sync_screen_overlay(self) -> None:
         """Propagates latest moves and board perspective to the on-screen live overlay."""

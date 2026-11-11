@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple, Dict, Set
 import chess
 from core.types import CandidateMove
+from core.gambits import GambitsAndTraps
 
 class BrilliantFarmer:
     """
@@ -16,6 +17,9 @@ class BrilliantFarmer:
     3. Non-obvious tactical initiative: King attacks, deflections, line clearances, or counter-blows.
     4. Not already overwhelmingly trivial (e.g. not +15 cp where any blunder still wins).
     """
+
+    def __init__(self):
+        self.gambits = GambitsAndTraps()
 
     PIECE_VALUES: Dict[chess.PieceType, int] = {
         chess.PAWN: 100,
@@ -46,6 +50,51 @@ class BrilliantFarmer:
         """
         if not candidates:
             return []
+
+        # Check known aggressive opening gambits and tactical traps
+        gambit_hit = self.gambits.find_gambit_or_trap(board)
+        if gambit_hit:
+            g_move, g_name, g_sac_type, g_idea = gambit_hit
+            try:
+                g_san = board.san(g_move)
+            except Exception:
+                g_san = g_move.uci()
+
+            found_cand = None
+            for c in candidates:
+                if c.move == g_move:
+                    found_cand = c
+                    break
+
+            if found_cand:
+                found_cand.is_brilliant = True
+                found_cand.brilliant_reason = f"{g_name} ({g_sac_type}): {g_idea}"
+                found_cand.rank = 1
+                found_cand.is_best = True
+                reordered = [found_cand] + [c for c in candidates if c.move != g_move]
+                for idx, c in enumerate(reordered[:3]):
+                    c.rank = idx + 1
+                    c.is_best = (idx == 0)
+                return reordered
+            else:
+                new_c = CandidateMove(
+                    move=g_move,
+                    san=g_san,
+                    rank=1,
+                    score_cp=35,
+                    eval_str="+0.35",
+                    eval_diff=0.0,
+                    short_explanation=f"Aggressive Opening Gambit: {g_name}",
+                    strategic_idea=g_idea,
+                    is_best=True,
+                    is_brilliant=True,
+                    brilliant_reason=f"{g_name} ({g_sac_type}): {g_idea}"
+                )
+                reordered = [new_c] + list(candidates)
+                for idx, c in enumerate(reordered[:3]):
+                    c.rank = idx + 1
+                    c.is_best = (idx == 0)
+                return reordered
 
         processed: List[CandidateMove] = []
         brilliant_cands: List[Tuple[CandidateMove, str]] = []
