@@ -345,50 +345,100 @@ class ChessboardWidget(QWidget):
         y2 = by + (r2 * sq_size) + (sq_size / 2.0)
 
         angle = math.atan2(y2 - y1, x2 - x1)
-        shaft_width = max(4.0, sq_size * 0.12) * scale_mult
-        head_length = sq_size * 0.36 * scale_mult
-        head_width = sq_size * 0.34 * scale_mult
+        shaft_width = max(4.5, sq_size * 0.12) * scale_mult
+        head_length = sq_size * 0.40 * scale_mult
+        head_width = sq_size * 0.38 * scale_mult
 
-        # Shorten destination slightly so tip centers cleanly on destination square
-        tip_x = x2 - math.cos(angle) * (sq_size * 0.12)
-        tip_y = y2 - math.sin(angle) * (sq_size * 0.12)
-
+        # Arrowhead positions
+        tip_x = x2 - math.cos(angle) * (sq_size * 0.10)
+        tip_y = y2 - math.sin(angle) * (sq_size * 0.10)
         base_x = tip_x - math.cos(angle) * head_length
         base_y = tip_y - math.sin(angle) * head_length
 
-        painter.save()
+        start_x = x1 + math.cos(angle) * (sq_size * 0.12)
+        start_y = y1 + math.sin(angle) * (sq_size * 0.12)
 
-        glow_alpha = 110 if glow else 60
-        glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), shaft_width + 6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setPen(glow_pen)
-        painter.drawLine(QPointF(x1, y1), QPointF(base_x, base_y))
-
-        pen = QPen(color, shaft_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setPen(pen)
-        painter.drawLine(QPointF(x1, y1), QPointF(base_x, base_y))
-
-        # Arrow head polygon
-        left_x = base_x + math.sin(angle) * (head_width / 2.0)
-        left_y = base_y - math.cos(angle) * (head_width / 2.0)
-        right_x = base_x - math.sin(angle) * (head_width / 2.0)
-        right_y = base_y + math.cos(angle) * (head_width / 2.0)
+        # Aerodynamic swept-back chevron head
+        sweep = head_length * 0.28
+        left_x = base_x + math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
+        left_y = base_y - math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
+        right_x = base_x - math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
+        right_y = base_y + math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
 
         arrow_head = QPolygonF([
             QPointF(tip_x, tip_y),
             QPointF(left_x, left_y),
+            QPointF(base_x, base_y),
             QPointF(right_x, right_y)
         ])
-        
-        # Glow pass for arrow head
-        glow_head_pen = QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), 3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), glow_alpha)))
-        painter.setPen(glow_head_pen)
+
+        painter.save()
+
+        # 1. Origin square glowing node
+        r_outer = shaft_width * 1.4
+        r_inner = shaft_width * 0.70
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 60)))
+        painter.drawEllipse(QPointF(x1, y1), r_outer, r_outer)
+        painter.setBrush(QBrush(color))
+        painter.drawEllipse(QPointF(x1, y1), r_inner, r_inner)
+        painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
+        painter.drawEllipse(QPointF(x1, y1), r_inner * 0.4, r_inner * 0.4)
+
+        # 2. Shaft - Multi-layer neon laser beam
+        # Pass 1: Soft ambient bloom halo
+        bloom_pen = QPen(
+            QColor(color.red(), color.green(), color.blue(), 45),
+            shaft_width + 10,
+            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
+        painter.setPen(bloom_pen)
+        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
+
+        # Pass 2: Radiant neon glow
+        glow_pen = QPen(
+            QColor(color.red(), color.green(), color.blue(), 110),
+            shaft_width + 4,
+            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
+        painter.setPen(glow_pen)
+        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
+
+        # Pass 3: Solid neon beam
+        core_pen = QPen(color, shaft_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        painter.setPen(core_pen)
+        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
+
+        # Pass 4: Laser specular core
+        spec_pen = QPen(
+            QColor(255, 255, 255, 210),
+            max(1.5, shaft_width * 0.28),
+            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
+        painter.setPen(spec_pen)
+        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
+
+        # 3. Arrowhead
+        # Pass 1: Head ambient bloom
+        head_bloom_pen = QPen(
+            QColor(color.red(), color.green(), color.blue(), 75),
+            5,
+            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        )
+        painter.setPen(head_bloom_pen)
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 85)))
         painter.drawPolygon(arrow_head)
 
-        # Core arrow head
+        # Pass 2: Head core
+        painter.setPen(QPen(QColor(255, 255, 255, 140), 1.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         painter.setBrush(QBrush(color))
-        painter.setPen(Qt.NoPen)
         painter.drawPolygon(arrow_head)
+
+        # Pass 3: Specular chiseled ridge down tip
+        ridge_pen = QPen(QColor(255, 255, 255, 230), max(1.2, shaft_width * 0.22), Qt.SolidLine, Qt.RoundCap)
+        painter.setPen(ridge_pen)
+        painter.drawLine(QPointF(tip_x, tip_y), QPointF(base_x, base_y))
+
         painter.restore()
 
     def mousePressEvent(self, event) -> None:

@@ -426,3 +426,54 @@ def test_undo_last_ply_safety_net(qapp):
     qapp.processEvents()
     observer.stop()
     engine_mgr.stop_engine()
+
+def test_screen_overlay_lifecycle_and_rendering(qapp):
+    from core.types import CandidateMove
+
+    board_state = BoardState()
+    engine_mgr = EngineManager()
+    analyzer = ChessAnalyzer()
+    gsm = GameStateManager(board_state, engine_mgr, analyzer)
+    mode_mgr = ModeManager()
+    repo = OpponentRepository(":memory:")
+    observer = BoardObserver(gsm)
+
+    win = MainWindow(gsm, observer, mode_mgr, repo)
+    win.show()
+    qapp.processEvents()
+
+    # Calibrate board
+    cal = BoardCalibration(x=120, y=120, width=480, height=480, is_calibrated=True)
+    win._on_calibration_confirmed(cal)
+    qapp.processEvents()
+
+    # Toggle overlay ON via MainWindow
+    win.toggle_screen_overlay()
+    qapp.processEvents()
+    assert win.screen_overlay.isVisible()
+    assert win.view_analysis._screen_hud_active
+    assert win.screen_overlay.geometry().x() == 120
+    assert win.screen_overlay.geometry().width() == 480
+
+    # Feed candidate moves and verify sync
+    c1 = CandidateMove(move=chess.Move.from_uci("e2e4"), san="e4", score_cp=35, eval_str="+0.35", rank=1)
+    c2 = CandidateMove(move=chess.Move.from_uci("d2d4"), san="d4", score_cp=28, eval_str="+0.28", rank=2)
+    c3 = CandidateMove(move=chess.Move.from_uci("g1f3"), san="Nf3", score_cp=20, eval_str="+0.20", rank=3)
+    gsm._latest_candidates = [c1, c2, c3]
+    win._sync_screen_overlay()
+    qapp.processEvents()
+    assert len(win.screen_overlay._candidate_moves) == 3
+
+    # Verify paintEvent executes cleanly without exceptions
+    win.screen_overlay.paintEvent(None)
+
+    # Toggle overlay OFF
+    win.toggle_screen_overlay()
+    qapp.processEvents()
+    assert not win.screen_overlay.isVisible()
+    assert not win.view_analysis._screen_hud_active
+
+    win.close()
+    qapp.processEvents()
+    observer.stop()
+    engine_mgr.stop_engine()

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QFrame, QLabel,
     QPushButton, QScrollArea, QSplitter
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from core.types import CandidateMove, PositionSummary, SyncStatus
 from core.game_state_manager import GameStateManager
 from core.modes import ModeManager
@@ -22,6 +22,8 @@ class AnalysisView(QWidget):
     """
     Focused live analysis workspace with high-visibility board and clear candidate move recommendations.
     """
+    screen_hud_requested = Signal()
+
     def __init__(
         self,
         game_state_mgr: GameStateManager,
@@ -31,6 +33,7 @@ class AnalysisView(QWidget):
         super().__init__(parent)
         self.game_state_mgr = game_state_mgr
         self.mode_mgr = mode_mgr
+        self._screen_hud_active = False
 
         self._setup_ui()
         self._connect_signals()
@@ -118,7 +121,7 @@ class AnalysisView(QWidget):
             }
         """
 
-        self.btn_flip = QPushButton("Flip Board ⟲")
+        self.btn_flip = QPushButton("Flip ⟲")
         self.btn_flip.setStyleSheet(btn_style)
         self.btn_flip.clicked.connect(self._on_flip_board)
         ctrl_row.addWidget(self.btn_flip)
@@ -134,14 +137,22 @@ class AnalysisView(QWidget):
         self.btn_toggle_arrows.clicked.connect(self._toggle_arrows)
         ctrl_row.addWidget(self.btn_toggle_arrows)
 
+        self.btn_screen_hud = QPushButton("🎯 Screen HUD")
+        self.btn_screen_hud.setToolTip("Toggle live on-screen move arrows directly on your game board (O)")
+        self.btn_screen_hud.setStyleSheet(btn_style)
+        self.btn_screen_hud.clicked.connect(self._on_toggle_screen_hud)
+        ctrl_row.addWidget(self.btn_screen_hud)
+
         ctrl_row.addStretch()
         board_layout.addWidget(self.ctrl_row_widget)
 
-        self.main_layout.addWidget(self.board_container, stretch=6)
+        self.main_layout.addWidget(self.board_container, stretch=1)
 
         # ---------------- RIGHT: MOVE ANALYSIS & COACH TAKEAWAY ----------------
         self.analysis_container = QFrame()
         self.analysis_container.setObjectName("AnalysisContainer")
+        self.analysis_container.setMinimumWidth(330)
+        self.analysis_container.setMaximumWidth(410)
         self.analysis_container.setStyleSheet("""
             QFrame#AnalysisContainer {
                 background-color: rgba(255, 255, 255, 0.03);
@@ -194,14 +205,14 @@ class AnalysisView(QWidget):
         cand_vbox.addWidget(self.card_3)
         cand_vbox.addStretch()
         cand_scroll.setWidget(cand_widget)
-        self.analysis_layout.addWidget(cand_scroll, stretch=1)
+        self.analysis_layout.addWidget(cand_scroll, stretch=0)
 
-        # Compact Move History Stepper at bottom
+        # Move History Stepper at bottom - dynamically expands to fill vertical space
         self.move_list_widget = MoveListWidget()
-        self.move_list_widget.setFixedHeight(95)
-        self.analysis_layout.addWidget(self.move_list_widget)
+        self.move_list_widget.setMinimumHeight(130)
+        self.analysis_layout.addWidget(self.move_list_widget, stretch=1)
 
-        self.main_layout.addWidget(self.analysis_container, stretch=5)
+        self.main_layout.addWidget(self.analysis_container, stretch=0)
 
         self._prev_rendered_move: Optional[chess.Move] = None
 
@@ -219,14 +230,18 @@ class AnalysisView(QWidget):
             self.main_layout.setDirection(QBoxLayout.TopToBottom)
             self.move_list_widget.setVisible(False)
             self.eval_bar.setVisible(False)
-            self.ctrl_row_widget.setVisible(False)
+            self.btn_reset_pos.setVisible(False)
+            self.ctrl_row_widget.setVisible(True)
 
             if show_mini_board:
                 self.board_container.setVisible(True)
-                self.board_widget.setMaximumSize(185, 185)
-                self.board_widget.setMinimumSize(120, 120)
+                self.board_widget.setMaximumSize(270, 270)
+                self.board_widget.setMinimumSize(160, 160)
             else:
                 self.board_container.setVisible(False)
+
+            self.analysis_container.setMaximumWidth(16777215)
+            self.analysis_container.setMinimumWidth(0)
 
             self.main_layout.setContentsMargins(6, 4, 6, 4)
             self.main_layout.setSpacing(4)
@@ -237,9 +252,13 @@ class AnalysisView(QWidget):
             self.board_container.setVisible(True)
             self.eval_bar.setVisible(True)
             self.ctrl_row_widget.setVisible(True)
+            self.btn_reset_pos.setVisible(True)
             self.board_widget.setMaximumSize(16777215, 16777215)
-            self.board_widget.setMinimumSize(220, 220)
+            self.board_widget.setMinimumSize(280, 280)
             self.move_list_widget.setVisible(True)
+
+            self.analysis_container.setMinimumWidth(330)
+            self.analysis_container.setMaximumWidth(410)
 
             self.main_layout.setContentsMargins(16, 12, 16, 12)
             self.main_layout.setSpacing(16)
@@ -279,6 +298,47 @@ class AnalysisView(QWidget):
     def _toggle_arrows(self) -> None:
         shown = self.board_widget.toggle_arrows()
         self.btn_toggle_arrows.setText("Arrows ✓" if shown else "Arrows ✕")
+
+    def _on_toggle_screen_hud(self) -> None:
+        self.screen_hud_requested.emit()
+
+    def set_screen_hud_active(self, active: bool) -> None:
+        self._screen_hud_active = active
+        if active:
+            self.btn_screen_hud.setText("🎯 Screen HUD: ON")
+            self.btn_screen_hud.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 240, 255, 0.20);
+                    color: #00F0FF;
+                    border: 1px solid rgba(0, 240, 255, 0.60);
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 240, 255, 0.32);
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_screen_hud.setText("🎯 Screen HUD")
+            self.btn_screen_hud.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 240, 255, 0.14);
+                    border-color: rgba(0, 240, 255, 0.35);
+                    color: #00F0FF;
+                }
+            """)
 
     def _on_candidate_hovered(self, rank: int) -> None:
         self.board_widget.set_highlighted_candidate_rank(rank if rank > 0 else None)

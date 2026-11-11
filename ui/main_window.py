@@ -30,6 +30,7 @@ from ui.views.opponent_view import OpponentView
 from ui.views.games_view import GamesView
 from ui.views.settings_view import SettingsView
 from ui.widgets.diagnostics_panel import DiagnosticsPanel
+from ui.widgets.screen_hud import ScreenBoardOverlay
 
 class MainWindow(QMainWindow):
     """
@@ -62,6 +63,8 @@ class MainWindow(QMainWindow):
 
         self._active_overlay: Optional[BoardSelectionOverlay] = None
         self._diagnostics_visible = False
+        self.screen_overlay = ScreenBoardOverlay()
+        self._activate_overlay_after_calibration = False
 
         self._setup_ui()
         self._setup_shortcuts()
@@ -470,6 +473,16 @@ class MainWindow(QMainWindow):
         if not self.observer.is_active():
             self.observer.start()
         self._update_mode_button_styles()
+
+        # Synchronize live on-screen HUD overlay if active or requested
+        if getattr(self, "_activate_overlay_after_calibration", False) or (hasattr(self, "screen_overlay") and self.screen_overlay and self.screen_overlay.isVisible()):
+            self.screen_overlay.update_calibration(cal)
+            self.screen_overlay.set_white_at_bottom(cal.orientation_white_bottom)
+            self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+            self.screen_overlay.show()
+            self.view_analysis.set_screen_hud_active(True)
+            self._activate_overlay_after_calibration = False
+
         # Switch to main analysis view immediately
         self.switch_view(0)
         self.show()
@@ -736,6 +749,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("P"), self, self.toggle_always_on_top)
         QShortcut(QKeySequence("M"), self, self.toggle_mini_board)
         QShortcut(QKeySequence("B"), self, self.open_board_selector)
+        QShortcut(QKeySequence("O"), self, self.toggle_screen_overlay)
         QShortcut(QKeySequence("D"), self, self._toggle_diagnostics)
         QShortcut(QKeySequence("F9"), self, self._on_flag_wrong_move)
         QShortcut(QKeySequence(Qt.Key_Backspace), self, self._on_undo_last_ply)
@@ -774,11 +788,15 @@ class MainWindow(QMainWindow):
         self.game_state_mgr.add_listener(self._on_game_state_changed)
         self.game_state_mgr.orientation_changed.connect(self._on_orientation_changed)
         self.game_state_mgr.add_diagnostics_listener(self.diagnostics_panel.update_diagnostics)
+        self.view_analysis.screen_hud_requested.connect(self.toggle_screen_overlay)
         self._on_game_state_changed()
 
     def _on_orientation_changed(self, white_bottom: bool) -> None:
         if self.moves_tab_observer and hasattr(self.moves_tab_observer, "calibration"):
             self.moves_tab_observer.calibration.orientation_white_bottom = white_bottom
+
+        if hasattr(self, "screen_overlay") and self.screen_overlay:
+            self.screen_overlay.set_white_at_bottom(white_bottom)
 
         if white_bottom:
             self.btn_side_toggle.setText("♔ White")
@@ -840,6 +858,41 @@ class MainWindow(QMainWindow):
             self.sync_pill.setText("Moves tab unavailable")
             self.sync_pill.setStyleSheet("background-color: rgba(255, 255, 255, 0.04); color: #94A3B8; border-left: 3px solid #64748B; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
 
+        self._sync_screen_overlay()
+
+    def _sync_screen_overlay(self) -> None:
+        """Propagates latest moves and board perspective to the on-screen live overlay."""
+        if hasattr(self, "screen_overlay") and self.screen_overlay and self.screen_overlay.isVisible():
+            orient = getattr(self.game_state_mgr, "orientation_white_bottom", True)
+            if callable(orient):
+                orient = orient()
+            self.screen_overlay.set_white_at_bottom(bool(orient))
+            self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+
+    def toggle_screen_overlay(self) -> None:
+        """
+        Toggles live on-screen HUD overlay that paints neon move arrows directly
+        over the physical chessboard of the match being played on screen.
+        """
+        if hasattr(self, "screen_overlay") and self.screen_overlay and self.screen_overlay.isVisible():
+            self.screen_overlay.hide()
+            self.view_analysis.set_screen_hud_active(False)
+        else:
+            cal = getattr(self.observer, "calibration", None)
+            if not cal or not cal.is_calibrated:
+                self._activate_overlay_after_calibration = True
+                self.open_board_selector()
+                return
+
+            orient = getattr(self.game_state_mgr, "orientation_white_bottom", True)
+            if callable(orient):
+                orient = orient()
+            self.screen_overlay.update_calibration(cal)
+            self.screen_overlay.set_white_at_bottom(bool(orient))
+            self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+            self.screen_overlay.show()
+            self.view_analysis.set_screen_hud_active(True)
+
     def _refresh_sync_pill_time(self) -> None:
         if self.game_state_mgr.sync_status == SyncStatus.SYNCHRONIZED:
             time_diff = int(time.time() - self.game_state_mgr.last_sync_time)
@@ -850,5 +903,10 @@ class MainWindow(QMainWindow):
         self._sync_timer.stop()
         self.moves_tab_observer.stop()
         self.observer.stop()
+        if hasattr(self, "screen_overlay") and self.screen_overlay:
+            try:
+                self.screen_overlay.close()
+            except Exception:
+                pass
         self.game_state_mgr.engine_mgr.stop_engine()
         super().closeEvent(event)
