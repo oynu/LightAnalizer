@@ -136,3 +136,18 @@ def test_mouse_controller_coordinates():
     bx, by = mc.get_square_coords(cal_black, chess.E8)
     assert bx == 350
     assert by == 750
+
+def test_mouse_controller_normalized_coords():
+    """Test normalized 0..65535 coordinate conversion."""
+    mc = MouseMoveController()
+    norm_x, norm_y = mc._to_normalized_coords(0, 0)
+    assert 0 <= norm_x <= 65535
+    assert 0 <= norm_y <= 65535
+
+def test_mouse_controller_rejects_uncalibrated():
+    """MouseMoveController must reject execution if board is not calibrated."""
+    mc = MouseMoveController()
+    uncal = BoardCalibration(is_calibrated=False)
+    res = mc.execute_move_async(uncal, chess.Move.from_uci("e2e4"))
+    assert res is False
+

@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
         self.screen_overlay = ScreenBoardOverlay()
         self.mouse_controller = MouseMoveController()
         self._activate_overlay_after_calibration = False
+        self._activate_auto_move_after_calibration = False
 
         self._setup_ui()
         self._setup_shortcuts()
@@ -485,6 +486,14 @@ class MainWindow(QMainWindow):
             self.view_analysis.set_screen_hud_active(True)
             self._activate_overlay_after_calibration = False
 
+        # If auto-move was toggled before board calibration, activate it now and trigger play
+        if getattr(self, "_activate_auto_move_after_calibration", False):
+            self._activate_auto_move_after_calibration = False
+            self.mouse_controller.auto_move_enabled = True
+            self.view_analysis.set_auto_move_active(True)
+            self.sync_pill.setText("🖱 Auto-Move ON")
+            QTimer.singleShot(400, lambda: self._try_auto_click_turn(force=True))
+
         # Switch to main analysis view immediately
         self.switch_view(0)
         self.show()
@@ -868,21 +877,53 @@ class MainWindow(QMainWindow):
         self._sync_screen_overlay()
         self._try_auto_click_turn()
 
+    def _get_active_calibration(self) -> Optional[BoardCalibration]:
+        """Returns the active calibrated board coordinates from vision observer or HUD overlay."""
+        cal = getattr(self.observer, "calibration", None)
+        if cal and cal.is_calibrated:
+            return cal
+        if hasattr(self, "screen_overlay") and self.screen_overlay:
+            cal_overlay = getattr(self.screen_overlay, "_calibration", None)
+            if cal_overlay and cal_overlay.is_calibrated:
+                return cal_overlay
+        return None
+
     def play_best_move_on_screen(self) -> bool:
         """Executes the top engine/brilliant move on the client chessboard via physical mouse clicks."""
-        cal = getattr(self.observer, "calibration", None)
-        if not cal or not cal.is_calibrated:
-            self.sync_pill.setText("⚠️ Select board first")
+        if getattr(self, "mouse_controller", None) and self.mouse_controller.is_executing:
             return False
+
+        cal = self._get_active_calibration()
+        if not cal or not cal.is_calibrated:
+            self.sync_pill.setText("⚠️ Select chessboard first to move")
+            self._activate_auto_move_after_calibration = True
+            self.open_board_selector()
+            return False
+
         cands = self.game_state_mgr.candidates
         if not cands:
+            self.sync_pill.setText("⏳ Waiting for engine...")
             return False
+
         best_cand = cands[0]
-        self.sync_pill.setText(f"🖱 Moving: {best_cand.san}...")
+        board = self.game_state_mgr.current_board
+        current_ply = board.ply()
+        self._last_auto_played_ply = current_ply
+
+        self.sync_pill.setText(f"🖱 Clicking: {best_cand.san}...")
+
+        def on_complete(success: bool):
+            if success:
+                self._on_screen_move_completed(True)
+            else:
+                self.sync_pill.setText(f"⚠️ Move click failed for {best_cand.san}")
+                # Reset ply tracker on failure so it can retry
+                self._last_auto_played_ply = -1
+
         return self.mouse_controller.execute_move_async(
             cal,
             best_cand.move,
-            on_complete=self._on_screen_move_completed
+            on_complete=on_complete
         )
 
     def _on_screen_move_completed(self, success: bool) -> None:
@@ -893,15 +934,24 @@ class MainWindow(QMainWindow):
     def _on_auto_move_toggled(self, active: bool) -> None:
         self.mouse_controller.auto_move_enabled = active
         if active:
-            self.sync_pill.setText("🖱 Auto-Move ON")
-            self._try_auto_click_turn()
+            cal = self._get_active_calibration()
+            if not cal or not cal.is_calibrated:
+                self.sync_pill.setText("⚠️ Select chessboard first to auto-move")
+                self._activate_auto_move_after_calibration = True
+                self.open_board_selector()
+                return
 
-    def _try_auto_click_turn(self) -> None:
+            self.sync_pill.setText("🖱 Auto-Move ON")
+            self._try_auto_click_turn(force=True)
+        else:
+            self.sync_pill.setText("🖱 Auto-Move OFF")
+
+    def _try_auto_click_turn(self, force: bool = False) -> None:
         if not getattr(self, "mouse_controller", None) or not self.mouse_controller.auto_move_enabled:
             return
         if self.mouse_controller.is_executing:
             return
-        cal = getattr(self.observer, "calibration", None)
+        cal = self._get_active_calibration()
         if not cal or not cal.is_calibrated:
             return
         cands = self.game_state_mgr.candidates
@@ -910,10 +960,11 @@ class MainWindow(QMainWindow):
         board = self.game_state_mgr.current_board
         player_color = getattr(self.game_state_mgr, "player_color", chess.WHITE)
         current_ply = board.ply()
-        if board.turn == player_color:
-            if getattr(self, "_last_auto_played_ply", -1) != current_ply:
-                self._last_auto_played_ply = current_ply
-                QTimer.singleShot(350, self.play_best_move_on_screen)
+
+        # If forced or player turn:
+        if force or board.turn == player_color:
+            if getattr(self, "_last_auto_played_ply", -1) != current_ply or force:
+                self.play_best_move_on_screen()
 
     def _sync_screen_overlay(self) -> None:
         """Propagates latest moves and board perspective to the on-screen live overlay."""
@@ -934,7 +985,7 @@ class MainWindow(QMainWindow):
             self.screen_overlay.hide()
             self.view_analysis.set_screen_hud_active(False)
         else:
-            cal = getattr(self.observer, "calibration", None)
+            cal = self._get_active_calibration()
             if not cal or not cal.is_calibrated:
                 self._activate_overlay_after_calibration = True
                 self.open_board_selector()
