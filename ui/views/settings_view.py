@@ -28,7 +28,7 @@ class SettingsView(QWidget):
         layout.setSpacing(14)
 
         title = QLabel("Engine & Application Settings")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #FFFFFF;")
+        title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         layout.addWidget(title)
 
         # Engine Configuration Group
@@ -42,6 +42,20 @@ class SettingsView(QWidget):
         self.path_input = QLineEdit(self.engine_mgr.config.engine_path)
         path_row.addWidget(self.path_input, stretch=1)
         btn_browse = QPushButton("Browse...")
+        btn_browse.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 6px 14px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
+            }
+        """)
         btn_browse.clicked.connect(self._browse_engine)
         path_row.addWidget(btn_browse)
         engine_layout.addLayout(path_row)
@@ -78,12 +92,36 @@ class SettingsView(QWidget):
         # Engine Actions
         actions_row = QHBoxLayout()
         btn_test = QPushButton("Test UCI Engine Connection")
-        btn_test.setStyleSheet("background-color: #1F2127; color: #60A5FA; border: 1px solid #2B2D35; padding: 6px 12px; border-radius: 5px;")
+        btn_test.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #00F0FF;
+                border: 1px solid rgba(0, 240, 255, 0.35);
+                padding: 7px 14px;
+                border-radius: 8px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 240, 255, 0.16);
+            }
+        """)
         btn_test.clicked.connect(self._test_engine)
         actions_row.addWidget(btn_test)
 
         btn_save = QPushButton("Save & Restart Engine")
-        btn_save.setStyleSheet("background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 6px 14px; border-radius: 5px;")
+        btn_save.setStyleSheet("""
+            QPushButton {
+                background-color: #00F0FF;
+                color: #080B12;
+                font-weight: 800;
+                padding: 7px 18px;
+                border-radius: 8px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #38BDF8;
+            }
+        """)
         btn_save.clicked.connect(self._save_engine_settings)
         actions_row.addWidget(btn_save)
         actions_row.addStretch()
@@ -98,15 +136,28 @@ class SettingsView(QWidget):
 
         lbl_priv = QLabel("LightAnalizer operates entirely locally. All game logs, positions, and opponent profiles are stored in a private SQLite database on this machine.")
         lbl_priv.setWordWrap(True)
-        lbl_priv.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        lbl_priv.setStyleSheet("color: #94A3B8; font-size: 12px;")
         privacy_layout.addWidget(lbl_priv)
 
         db_path_lbl = QLabel(f"Database Location: {self.repo.db_path}")
-        db_path_lbl.setStyleSheet("color: #6B7280; font-size: 11px;")
+        db_path_lbl.setStyleSheet("color: #64748B; font-size: 11px;")
         privacy_layout.addWidget(db_path_lbl)
 
         btn_clear_db = QPushButton("Delete All Personal Profiles & History")
-        btn_clear_db.setStyleSheet("background-color: #311313; color: #EF4444; border: 1px solid #7F1D1D; padding: 6px 12px; border-radius: 5px; max-width: 260px;")
+        btn_clear_db.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 42, 133, 0.12);
+                color: #FF2A85;
+                border: 1px solid rgba(255, 42, 133, 0.35);
+                padding: 7px 14px;
+                border-radius: 8px;
+                font-weight: 700;
+                max-width: 270px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 42, 133, 0.22);
+            }
+        """)
         btn_clear_db.clicked.connect(self._clear_database)
         privacy_layout.addWidget(btn_clear_db)
 

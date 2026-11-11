@@ -34,47 +34,58 @@ class PositionSetupDialog(QDialog):
     def _setup_ui(self) -> None:
         self.setStyleSheet("""
             QDialog {
-                background-color: #141518;
-                color: #EDEDED;
+                background-color: #080B12;
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 16px;
             }
             QLabel {
-                color: #D1D5DB;
+                color: #CBD5E1;
                 font-size: 12px;
             }
             QLineEdit {
-                background-color: #1E2127;
-                color: #FFFFFF;
-                border: 1px solid #374151;
-                border-radius: 6px;
-                padding: 8px 10px;
-                font-family: monospace;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
                 font-size: 11px;
             }
             QLineEdit:focus {
-                border-color: #3B82F6;
+                border-color: #00F0FF;
+                background-color: rgba(0, 240, 255, 0.05);
             }
             QPushButton {
-                background-color: #1F2127;
-                color: #D1D5DB;
-                border: 1px solid #2B2D35;
-                border-radius: 6px;
-                padding: 6px 14px;
+                background-color: rgba(255, 255, 255, 0.06);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 7px 14px;
                 font-size: 12px;
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #2D303B;
-                color: #FFFFFF;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.40);
+                color: #00F0FF;
             }
             QRadioButton {
-                color: #E5E7EB;
+                color: #F8FAFC;
                 font-size: 12px;
                 font-weight: 600;
                 spacing: 8px;
             }
             QRadioButton::indicator {
-                width: 14px;
-                height: 14px;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                border: 2px solid rgba(255, 255, 255, 0.30);
+                background-color: transparent;
+            }
+            QRadioButton::indicator:checked {
+                border: 2px solid #00F0FF;
+                background-color: #00F0FF;
             }
         """)
 
@@ -125,12 +136,12 @@ class PositionSetupDialog(QDialog):
         # Divider
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
-        divider.setStyleSheet("color: #23252B; background-color: #23252B; max-height: 1px;")
+        divider.setStyleSheet("color: rgba(255, 255, 255, 0.10); background-color: rgba(255, 255, 255, 0.10); max-height: 1px;")
         layout.addWidget(divider)
 
         # Custom FEN Input
         fen_label = QLabel("CUSTOM FEN POSITION")
-        fen_label.setStyleSheet("font-size: 10px; font-weight: 700; color: #60A5FA; letter-spacing: 0.5px;")
+        fen_label.setStyleSheet("font-size: 10px; font-weight: 800; color: #00F0FF; letter-spacing: 0.8px;")
         layout.addWidget(fen_label)
 
         fen_row = QHBoxLayout()
@@ -147,7 +158,7 @@ class PositionSetupDialog(QDialog):
         layout.addLayout(fen_row)
 
         self.lbl_fen_status = QLabel("✓ Valid starting position")
-        self.lbl_fen_status.setStyleSheet("font-size: 11px; color: #34D399; font-weight: 600;")
+        self.lbl_fen_status.setStyleSheet("font-size: 11px; color: #00FF9D; font-weight: 700;")
         layout.addWidget(self.lbl_fen_status)
 
         # Board Orientation Selection
@@ -187,14 +198,16 @@ class PositionSetupDialog(QDialog):
         self.btn_apply = QPushButton("Apply Position")
         self.btn_apply.setStyleSheet("""
             QPushButton {
-                background-color: #2563EB;
-                color: #FFFFFF;
-                border: 1px solid #3B82F6;
+                background-color: #00F0FF;
+                color: #080B12;
+                border: 1px solid rgba(0, 240, 255, 0.60);
                 padding: 7px 18px;
-                font-weight: 700;
+                font-weight: 800;
+                border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #1D4ED8;
+                background-color: #38BDF8;
+                border-color: #38BDF8;
             }
         """)
         self.btn_apply.clicked.connect(self._apply_position)

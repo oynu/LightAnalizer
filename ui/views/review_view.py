@@ -34,22 +34,22 @@ class ReviewView(QWidget):
         # Header Row
         header_row = QHBoxLayout()
         title = QLabel("Post-Game Performance Review")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #FFFFFF;")
+        title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         header_row.addWidget(title)
         header_row.addStretch()
 
         self.btn_run_review = QPushButton("▶ Run Game Review")
         self.btn_run_review.setStyleSheet("""
             QPushButton {
-                background-color: #2563EB;
-                color: #FFFFFF;
-                font-weight: 600;
-                padding: 8px 16px;
-                border-radius: 6px;
-                border: 1px solid #3B82F6;
+                background-color: #00F0FF;
+                color: #080B12;
+                font-weight: 800;
+                padding: 8px 18px;
+                border-radius: 8px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #1D4ED8;
+                background-color: #38BDF8;
             }
         """)
         self.btn_run_review.clicked.connect(self._run_review_async)
@@ -62,12 +62,12 @@ class ReviewView(QWidget):
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #1E2025;
+                background-color: rgba(255, 255, 255, 0.05);
                 border-radius: 3px;
                 border: none;
             }
             QProgressBar::chunk {
-                background-color: #3B82F6;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00F0FF, stop:1 #A855F7);
                 border-radius: 3px;
             }
         """)
@@ -80,24 +80,38 @@ class ReviewView(QWidget):
 
         # White Card
         self.card_white = QFrame()
-        self.card_white.setStyleSheet("background-color: #18191E; border: 1px solid #23252B; border-radius: 8px; padding: 12px;")
+        self.card_white.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 14px;
+                padding: 12px;
+            }
+        """)
         cw_layout = QVBoxLayout(self.card_white)
         self.lbl_w_acc = QLabel("White Accuracy: --%")
-        self.lbl_w_acc.setStyleSheet("font-size: 15px; font-weight: 700; color: #FFFFFF;")
+        self.lbl_w_acc.setStyleSheet("font-size: 16px; font-weight: 800; color: #F8FAFC;")
         self.lbl_w_stats = QLabel("Blunders: 0 | Mistakes: 0 | Inaccuracies: 0")
-        self.lbl_w_stats.setStyleSheet("font-size: 12px; color: #9CA3AF;")
+        self.lbl_w_stats.setStyleSheet("font-size: 12px; color: #94A3B8;")
         cw_layout.addWidget(self.lbl_w_acc)
         cw_layout.addWidget(self.lbl_w_stats)
         cards_row.addWidget(self.card_white)
 
         # Black Card
         self.card_black = QFrame()
-        self.card_black.setStyleSheet("background-color: #18191E; border: 1px solid #23252B; border-radius: 8px; padding: 12px;")
+        self.card_black.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 14px;
+                padding: 12px;
+            }
+        """)
         cb_layout = QVBoxLayout(self.card_black)
         self.lbl_b_acc = QLabel("Black Accuracy: --%")
-        self.lbl_b_acc.setStyleSheet("font-size: 15px; font-weight: 700; color: #FFFFFF;")
+        self.lbl_b_acc.setStyleSheet("font-size: 16px; font-weight: 800; color: #F8FAFC;")
         self.lbl_b_stats = QLabel("Blunders: 0 | Mistakes: 0 | Inaccuracies: 0")
-        self.lbl_b_stats.setStyleSheet("font-size: 12px; color: #9CA3AF;")
+        self.lbl_b_stats.setStyleSheet("font-size: 12px; color: #94A3B8;")
         cb_layout.addWidget(self.lbl_b_acc)
         cb_layout.addWidget(self.lbl_b_stats)
         cards_row.addWidget(self.card_black)
@@ -111,6 +125,32 @@ class ReviewView(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet("""
+            QTableWidget {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                color: #F8FAFC;
+                padding: 4px;
+            }
+            QTableWidget::item {
+                border-radius: 6px;
+                padding: 6px 8px;
+            }
+            QTableWidget::item:selected {
+                background-color: rgba(0, 240, 255, 0.20);
+                color: #00F0FF;
+            }
+            QHeaderView::section {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #94A3B8;
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+                padding: 8px;
+                font-weight: 700;
+            }
+        """)
         self.table.cellDoubleClicked.connect(self._on_row_double_clicked)
         layout.addWidget(self.table, stretch=1)
 

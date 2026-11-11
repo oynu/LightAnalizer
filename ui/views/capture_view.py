@@ -46,12 +46,12 @@ class CaptureView(QWidget):
         ctrl_layout.setSpacing(12)
 
         lbl_title = QLabel("Screen Capture & Calibration")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #FFFFFF;")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: 800; color: #F8FAFC;")
         ctrl_layout.addWidget(lbl_title)
 
         privacy_note = QLabel("🔒 Privacy Notice: All screen processing occurs 100% locally on your PC. No screenshots are transmitted.")
         privacy_note.setWordWrap(True)
-        privacy_note.setStyleSheet("background-color: #161B26; color: #93C5FD; border-radius: 5px; padding: 8px; font-size: 11px;")
+        privacy_note.setStyleSheet("background-color: rgba(0, 240, 255, 0.08); color: #00F0FF; border: 1px solid rgba(0, 240, 255, 0.20); border-radius: 8px; padding: 8px; font-size: 11px;")
         ctrl_layout.addWidget(privacy_note)
 
         # Coordinates Group
@@ -96,31 +96,35 @@ class CaptureView(QWidget):
         self.chk_white_bottom.setChecked(self.observer.calibration.orientation_white_bottom)
         ctrl_layout.addWidget(self.chk_white_bottom)
 
-        # Actions Row
-        self.btn_auto_detect = QPushButton("🔍 Auto-Detect Board from Screen")
-        self.btn_auto_detect.setStyleSheet("""
+        btn_glass = """
             QPushButton {
-                background-color: #1F2127;
-                color: #EDEDED;
-                border: 1px solid #2B2D35;
-                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 8px;
-                font-weight: 500;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #2D303B;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
             }
-        """)
+        """
+
+        # Actions Row
+        self.btn_auto_detect = QPushButton("🔍 Auto-Detect Board from Screen")
+        self.btn_auto_detect.setStyleSheet(btn_glass)
         self.btn_auto_detect.clicked.connect(self._auto_detect_board)
         ctrl_layout.addWidget(self.btn_auto_detect)
 
         self.btn_test_snap = QPushButton("📸 Test Capture Snapshot")
-        self.btn_test_snap.setStyleSheet("background-color: #1F2127; color: #EDEDED; border: 1px solid #2B2D35; border-radius: 5px; padding: 8px;")
+        self.btn_test_snap.setStyleSheet(btn_glass)
         self.btn_test_snap.clicked.connect(self._test_capture)
         ctrl_layout.addWidget(self.btn_test_snap)
 
         self.btn_test_recog = QPushButton("♟ Test Piece Recognition")
-        self.btn_test_recog.setStyleSheet("background-color: #1F2127; color: #EDEDED; border: 1px solid #2B2D35; border-radius: 5px; padding: 8px;")
+        self.btn_test_recog.setStyleSheet(btn_glass)
         self.btn_test_recog.clicked.connect(self._test_recognition)
         ctrl_layout.addWidget(self.btn_test_recog)
 
@@ -128,15 +132,15 @@ class CaptureView(QWidget):
         self.btn_toggle_obs = QPushButton("Start Screen Observation")
         self.btn_toggle_obs.setStyleSheet("""
             QPushButton {
-                background-color: #065F46;
-                color: #6EE7B7;
-                border: 1px solid #059669;
-                border-radius: 6px;
+                background-color: rgba(0, 255, 157, 0.18);
+                color: #00FF9D;
+                border: 1px solid rgba(0, 255, 157, 0.50);
+                border-radius: 8px;
                 padding: 10px;
-                font-weight: 700;
+                font-weight: 800;
             }
             QPushButton:hover {
-                background-color: #047857;
+                background-color: rgba(0, 255, 157, 0.28);
             }
         """)
         self.btn_toggle_obs.clicked.connect(self._toggle_observation)
@@ -152,21 +156,21 @@ class CaptureView(QWidget):
         preview_layout.setSpacing(8)
 
         lbl_prev_title = QLabel("Captured Region Preview")
-        lbl_prev_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
+        lbl_prev_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
         preview_layout.addWidget(lbl_prev_title)
 
         self.preview_label = QLabel("Click 'Test Capture Snapshot' or 'Auto-Detect Board' to view calibrated screen area.")
         self.preview_label.setAlignment(Qt.AlignCenter)
         self.preview_label.setStyleSheet("""
-            background-color: #141518;
-            border: 1px dashed #2B2D35;
-            border-radius: 8px;
-            color: #6B7280;
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            color: #64748B;
         """)
         preview_layout.addWidget(self.preview_label, stretch=1)
 
         self.recog_status_lbl = QLabel("")
-        self.recog_status_lbl.setStyleSheet("color: #34D399; font-size: 12px; font-weight: 600;")
+        self.recog_status_lbl.setStyleSheet("color: #00FF9D; font-size: 12px; font-weight: 700;")
         preview_layout.addWidget(self.recog_status_lbl)
 
         main_layout.addWidget(preview_panel)
@@ -252,8 +256,8 @@ class CaptureView(QWidget):
         if self.observer.is_active():
             self.observer.stop()
             self.btn_toggle_obs.setText("Start Screen Observation")
-            self.btn_toggle_obs.setStyleSheet("background-color: #065F46; color: #6EE7B7; border: 1px solid #059669; border-radius: 6px; padding: 10px; font-weight: 700;")
+            self.btn_toggle_obs.setStyleSheet("background-color: rgba(0, 255, 157, 0.18); color: #00FF9D; border: 1px solid rgba(0, 255, 157, 0.50); border-radius: 8px; padding: 10px; font-weight: 800;")
         else:
             self.observer.start()
             self.btn_toggle_obs.setText("⏹ Stop Screen Observation")
-            self.btn_toggle_obs.setStyleSheet("background-color: #7F1D1D; color: #FCA5A5; border: 1px solid #DC2626; border-radius: 6px; padding: 10px; font-weight: 700;")
+            self.btn_toggle_obs.setStyleSheet("background-color: rgba(255, 42, 133, 0.18); color: #FF2A85; border: 1px solid rgba(255, 42, 133, 0.50); border-radius: 8px; padding: 10px; font-weight: 800;")

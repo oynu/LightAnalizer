@@ -23,33 +23,33 @@ class DiagnosticsPanel(QFrame):
         self.setObjectName("DiagnosticsPanel")
         self.setStyleSheet("""
             QFrame#DiagnosticsPanel {
-                background-color: #0F1013;
-                border-top: 1px solid #23252B;
+                background-color: rgba(10, 14, 24, 0.88);
+                border-top: 1px solid rgba(255, 255, 255, 0.12);
                 padding: 10px;
             }
             QLabel {
-                font-family: monospace;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
                 font-size: 11px;
-                color: #9CA3AF;
+                color: #94A3B8;
             }
             QLabel.Value {
-                color: #EDEDED;
-                font-weight: 600;
+                color: #F8FAFC;
+                font-weight: 700;
             }
             QLabel.Header {
-                font-family: sans-serif;
+                font-family: 'Segoe UI Variable Display', 'Inter', sans-serif;
                 font-size: 11px;
-                font-weight: 700;
-                color: #60A5FA;
-                letter-spacing: 0.5px;
+                font-weight: 800;
+                color: #00F0FF;
+                letter-spacing: 0.8px;
             }
         """)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(12, 8, 12, 8)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(14, 10, 14, 10)
+        main_layout.setSpacing(18)
 
         # 1. Left: Captured Crop Preview
         crop_box = QVBoxLayout()
@@ -59,7 +59,12 @@ class DiagnosticsPanel(QFrame):
 
         self.preview_lbl = QLabel("No frame")
         self.preview_lbl.setFixedSize(120, 120)
-        self.preview_lbl.setStyleSheet("background-color: #16171B; border: 1px solid #23252B; border-radius: 4px;")
+        self.preview_lbl.setStyleSheet("""
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            color: #64748B;
+        """)
         self.preview_lbl.setAlignment(Qt.AlignCenter)
         crop_box.addWidget(self.preview_lbl)
         main_layout.addLayout(crop_box)
@@ -72,7 +77,7 @@ class DiagnosticsPanel(QFrame):
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
-        grid.setVerticalSpacing(4)
+        grid.setVerticalSpacing(5)
 
         grid.addWidget(QLabel("Capture Latency:"), 0, 0)
         self.lbl_cap_ms = QLabel("0.0 ms")
@@ -105,18 +110,20 @@ class DiagnosticsPanel(QFrame):
 
         self.lbl_sync_stat = QLabel("Status: BOARD_UNAVAILABLE")
         self.lbl_sync_stat.setProperty("class", "Value")
+        self.lbl_sync_stat.setStyleSheet("color: #FF2A85; font-weight: 700;")
         state_box.addWidget(self.lbl_sync_stat)
 
         self.lbl_last_move = QLabel("Last Move: None")
+        self.lbl_last_move.setStyleSheet("color: #F8FAFC;")
         state_box.addWidget(self.lbl_last_move)
 
         self.lbl_fen = QLabel("FEN: None")
         self.lbl_fen.setWordWrap(True)
-        self.lbl_fen.setStyleSheet("color: #60A5FA; font-size: 10px;")
+        self.lbl_fen.setStyleSheet("color: #00F0FF; font-size: 10px;")
         state_box.addWidget(self.lbl_fen)
 
         self.lbl_rejection = QLabel("Rejection Reason: None")
-        self.lbl_rejection.setStyleSheet("color: #F87171; font-size: 10px;")
+        self.lbl_rejection.setStyleSheet("color: #FFB800; font-size: 10px;")
         state_box.addWidget(self.lbl_rejection)
 
         main_layout.addLayout(state_box, stretch=1)
@@ -130,7 +137,16 @@ class DiagnosticsPanel(QFrame):
         self.lbl_tot_ms.setText(f"{diag.total_latency_ms:.1f} ms")
         self.lbl_fps.setText(f"{diag.fps:.1f} Hz")
 
-        self.lbl_sync_stat.setText(f"Status: {diag.sync_status.value} (conf: {diag.confidence*100:.0f}%)")
+        status_str = diag.sync_status.value
+        conf_str = f"{diag.confidence*100:.0f}%"
+        self.lbl_sync_stat.setText(f"Status: {status_str} (conf: {conf_str})")
+        if "SYNCED" in status_str or "READY" in status_str:
+            self.lbl_sync_stat.setStyleSheet("color: #00FF9D; font-weight: 700;")
+        elif "SCANNING" in status_str or "WAITING" in status_str or "OBSCURED" in status_str:
+            self.lbl_sync_stat.setStyleSheet("color: #FFB800; font-weight: 700;")
+        else:
+            self.lbl_sync_stat.setStyleSheet("color: #FF2A85; font-weight: 700;")
+
         self.lbl_last_move.setText(f"Last Move: {diag.last_move_san or 'None'}")
         self.lbl_fen.setText(f"Live FEN: {diag.detected_fen}")
         self.lbl_rejection.setText(f"Notice: {diag.rejection_reason or 'None (normal sync)'}")

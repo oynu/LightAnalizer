@@ -98,8 +98,8 @@ class MainWindow(QMainWindow):
         top_bar = QFrame()
         top_bar.setStyleSheet("""
             QFrame {
-                background-color: #141518;
-                border-bottom: 1px solid #23252B;
+                background-color: rgba(10, 14, 24, 0.82);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.12);
                 padding: 4px 12px;
             }
         """)
@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
 
         # Brand Logo
         self.lbl_brand = QLabel("LIGHTANALIZER")
-        self.lbl_brand.setStyleSheet("font-size: 13px; font-weight: 800; letter-spacing: 1.2px; color: #FFFFFF;")
+        self.lbl_brand.setStyleSheet("font-family: 'Segoe UI Variable Display', 'Inter', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; color: #F8FAFC;")
         top_layout.addWidget(self.lbl_brand)
 
         top_layout.addSpacing(8)
@@ -118,16 +118,17 @@ class MainWindow(QMainWindow):
         self.btn_select_moves = QPushButton("📝 Select Moves Tab")
         self.btn_select_moves.setStyleSheet("""
             QPushButton {
-                background-color: #2563EB;
-                color: #FFFFFF;
-                border: 1px solid #3B82F6;
-                border-radius: 6px;
+                background-color: #00F0FF;
+                color: #080B12;
+                border: 1px solid rgba(0, 240, 255, 0.60);
+                border-radius: 8px;
                 padding: 6px 16px;
-                font-weight: 700;
+                font-weight: 800;
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #1D4ED8;
+                background-color: #38BDF8;
+                border-color: #38BDF8;
             }
         """)
         self.btn_select_moves.clicked.connect(self.open_moves_tab_selector)
@@ -138,17 +139,18 @@ class MainWindow(QMainWindow):
         self.btn_select_board.setToolTip("Auto-detect or drag-select screen chessboard (B)")
         self.btn_select_board.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #D1D5DB;
-                border: 1px solid #2B2D35;
-                border-radius: 6px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 6px 12px;
                 font-weight: 600;
                 font-size: 11px;
             }
             QPushButton:hover {
-                background-color: #2D303B;
-                color: #FFFFFF;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
             }
         """)
         self.btn_select_board.clicked.connect(self.open_board_selector)
@@ -159,17 +161,18 @@ class MainWindow(QMainWindow):
         self.btn_set_pos.setToolTip("Set starting position (White/Black, FEN, or common openings) (Ctrl+P)")
         self.btn_set_pos.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #D1D5DB;
-                border: 1px solid #2B2D35;
-                border-radius: 6px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 6px 12px;
                 font-weight: 600;
                 font-size: 11px;
             }
             QPushButton:hover {
-                background-color: #2D303B;
-                color: #FFFFFF;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
             }
         """)
         self.btn_set_pos.clicked.connect(self.open_position_dialog)
@@ -178,10 +181,10 @@ class MainWindow(QMainWindow):
         # Synchronization Status Pill
         self.sync_pill = QLabel("Moves tab unavailable")
         self.sync_pill.setStyleSheet("""
-            background-color: #27272A;
-            color: #A1A1AA;
-            border-left: 4px solid #71717A;
-            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.04);
+            color: #94A3B8;
+            border-left: 3px solid #64748B;
+            border-radius: 8px;
             padding: 5px 12px;
             font-size: 11px;
             font-weight: 600;
@@ -195,17 +198,16 @@ class MainWindow(QMainWindow):
         self.btn_side_toggle.setToolTip("Playing as White (White at bottom). Click or press F to switch to Black")
         self.btn_side_toggle.setStyleSheet("""
             QPushButton {
-                background-color: #1F2430;
-                color: #FFFFFF;
-                border: 1px solid #3B82F6;
-                border-radius: 5px;
-                padding: 5px 8px;
+                background-color: rgba(255, 255, 255, 0.08);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.20);
+                border-radius: 8px;
+                padding: 5px 10px;
                 font-size: 11px;
                 font-weight: 700;
             }
             QPushButton:hover {
-                background-color: #2D3748;
-                border-color: #60A5FA;
+                background-color: rgba(255, 255, 255, 0.14);
             }
         """)
         self.btn_side_toggle.clicked.connect(self.game_state_mgr.toggle_orientation)
@@ -216,16 +218,16 @@ class MainWindow(QMainWindow):
         self.btn_board_toggle.setToolTip("Toggle small visual chessboard in compact view (M)")
         self.btn_board_toggle.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #A7F3D0;
-                border: 1px solid #059669;
-                border-radius: 5px;
+                background-color: rgba(0, 255, 157, 0.14);
+                color: #00FF9D;
+                border: 1px solid rgba(0, 255, 157, 0.35);
+                border-radius: 8px;
                 padding: 5px 10px;
                 font-size: 11px;
-                font-weight: 600;
+                font-weight: 700;
             }
             QPushButton:hover {
-                background-color: #064E3B;
+                background-color: rgba(0, 255, 157, 0.24);
                 color: #FFFFFF;
             }
         """)
@@ -237,17 +239,18 @@ class MainWindow(QMainWindow):
         self.btn_pin.setToolTip("Keep window floating on top of screen (P)")
         self.btn_pin.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #9CA3AF;
-                border: 1px solid #2B2D35;
-                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 5px 10px;
                 font-size: 11px;
                 font-weight: 600;
             }
             QPushButton:hover {
-                color: #EDEDED;
-                background-color: #2D303B;
+                color: #00F0FF;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
             }
         """)
         self.btn_pin.clicked.connect(self.toggle_always_on_top)
@@ -258,16 +261,16 @@ class MainWindow(QMainWindow):
         self.btn_compact_toggle.setToolTip("Toggle between sleek compact HUD and full board view (C)")
         self.btn_compact_toggle.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #93C5FD;
-                border: 1px solid #2563EB;
-                border-radius: 5px;
+                background-color: rgba(168, 85, 247, 0.14);
+                color: #C084FC;
+                border: 1px solid rgba(168, 85, 247, 0.35);
+                border-radius: 8px;
                 padding: 5px 10px;
                 font-size: 11px;
-                font-weight: 600;
+                font-weight: 700;
             }
             QPushButton:hover {
-                background-color: #1E3A8A;
+                background-color: rgba(168, 85, 247, 0.24);
                 color: #FFFFFF;
             }
         """)
@@ -280,7 +283,7 @@ class MainWindow(QMainWindow):
         mode_box.setContentsMargins(0, 0, 0, 0)
         mode_box.setSpacing(6)
         lbl_m = QLabel("Mode:")
-        lbl_m.setStyleSheet("color: #6B7280; font-size: 11px; font-weight: 600;")
+        lbl_m.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: 600;")
         mode_box.addWidget(lbl_m)
 
         self.mode_combo = QComboBox()
@@ -296,17 +299,18 @@ class MainWindow(QMainWindow):
         self.btn_menu = QPushButton("Workspaces...")
         self.btn_menu.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #D1D5DB;
-                border: 1px solid #2B2D35;
-                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 5px 12px;
                 font-size: 11px;
                 font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #2D303B;
-                color: #FFFFFF;
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
             }
         """)
         self._setup_workspaces_menu()
@@ -316,15 +320,16 @@ class MainWindow(QMainWindow):
         self.btn_diag = QPushButton("Diagnostics")
         self.btn_diag.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #9CA3AF;
-                border: 1px solid #2B2D35;
-                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
                 padding: 5px 10px;
                 font-size: 11px;
             }
             QPushButton:hover {
-                color: #EDEDED;
+                color: #00F0FF;
+                border-color: rgba(0, 240, 255, 0.35);
             }
         """)
         self.btn_diag.clicked.connect(self._toggle_diagnostics)
@@ -358,18 +363,19 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background-color: #18191E;
-                color: #EDEDED;
-                border: 1px solid #2B2D35;
-                border-radius: 6px;
-                padding: 4px;
+                background-color: #080B12;
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 10px;
+                padding: 6px;
             }
             QMenu::item {
-                padding: 6px 16px;
-                border-radius: 4px;
+                padding: 7px 18px;
+                border-radius: 6px;
             }
             QMenu::item:selected {
-                background-color: #2563EB;
+                background-color: rgba(0, 240, 255, 0.20);
+                color: #00F0FF;
             }
         """)
 
@@ -480,55 +486,55 @@ class MainWindow(QMainWindow):
         if board_active:
             self.btn_select_board.setStyleSheet("""
                 QPushButton {
-                    background-color: #059669;
-                    color: #FFFFFF;
-                    border: 1px solid #10B981;
-                    border-radius: 6px;
-                    padding: 5px 10px;
+                    background-color: rgba(0, 255, 157, 0.18);
+                    color: #00FF9D;
+                    border: 1px solid rgba(0, 255, 157, 0.55);
+                    border-radius: 8px;
+                    padding: 5px 12px;
                     font-weight: 700;
                     font-size: 11px;
                 }
-                QPushButton:hover { background-color: #047857; }
+                QPushButton:hover { background-color: rgba(0, 255, 157, 0.28); }
             """)
         else:
             self.btn_select_board.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #D1D5DB;
-                    border: 1px solid #2B2D35;
-                    border-radius: 6px;
-                    padding: 5px 10px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.10);
+                    border-radius: 8px;
+                    padding: 5px 12px;
                     font-weight: 600;
                     font-size: 11px;
                 }
-                QPushButton:hover { background-color: #2D303B; color: #FFFFFF; }
+                QPushButton:hover { background-color: rgba(0, 240, 255, 0.12); color: #00F0FF; }
             """)
 
         if moves_active:
             self.btn_select_moves.setStyleSheet("""
                 QPushButton {
-                    background-color: #2563EB;
-                    color: #FFFFFF;
-                    border: 1px solid #3B82F6;
-                    border-radius: 6px;
-                    padding: 5px 10px;
+                    background-color: rgba(0, 240, 255, 0.20);
+                    color: #00F0FF;
+                    border: 1px solid rgba(0, 240, 255, 0.60);
+                    border-radius: 8px;
+                    padding: 5px 12px;
                     font-weight: 700;
                     font-size: 11px;
                 }
-                QPushButton:hover { background-color: #1D4ED8; }
+                QPushButton:hover { background-color: rgba(0, 240, 255, 0.30); }
             """)
         else:
             self.btn_select_moves.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #D1D5DB;
-                    border: 1px solid #2B2D35;
-                    border-radius: 6px;
-                    padding: 5px 10px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.10);
+                    border-radius: 8px;
+                    padding: 5px 12px;
                     font-weight: 600;
                     font-size: 11px;
                 }
-                QPushButton:hover { background-color: #2D303B; color: #FFFFFF; }
+                QPushButton:hover { background-color: rgba(0, 240, 255, 0.12); color: #00F0FF; }
             """)
 
     def _apply_win32_topmost(self, pinned: bool) -> None:
@@ -567,16 +573,16 @@ class MainWindow(QMainWindow):
             self.btn_pin.setToolTip("Window is permanently floating on top of screen. Click to unpin (P)")
             self.btn_pin.setStyleSheet("""
                 QPushButton {
-                    background-color: #2563EB;
-                    color: #FFFFFF;
-                    border: 1px solid #3B82F6;
-                    border-radius: 5px;
+                    background-color: rgba(0, 240, 255, 0.18);
+                    color: #00F0FF;
+                    border: 1px solid rgba(0, 240, 255, 0.50);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
                     font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #1D4ED8;
+                    background-color: rgba(0, 240, 255, 0.28);
                 }
             """)
         else:
@@ -585,17 +591,18 @@ class MainWindow(QMainWindow):
             self.btn_pin.setToolTip("Keep window floating on top of screen (P)")
             self.btn_pin.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #9CA3AF;
-                    border: 1px solid #2B2D35;
-                    border-radius: 5px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
                     font-weight: 600;
                 }
                 QPushButton:hover {
-                    color: #EDEDED;
-                    background-color: #2D303B;
+                    color: #00F0FF;
+                    background-color: rgba(0, 240, 255, 0.14);
+                    border-color: rgba(0, 240, 255, 0.35);
                 }
             """)
         self.show()
@@ -608,16 +615,16 @@ class MainWindow(QMainWindow):
             self.btn_board_toggle.setText("♟ Board: ON")
             self.btn_board_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #A7F3D0;
-                    border: 1px solid #059669;
-                    border-radius: 5px;
+                    background-color: rgba(0, 255, 157, 0.14);
+                    color: #00FF9D;
+                    border: 1px solid rgba(0, 255, 157, 0.35);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
-                    font-weight: 600;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #064E3B;
+                    background-color: rgba(0, 255, 157, 0.24);
                     color: #FFFFFF;
                 }
             """)
@@ -627,17 +634,17 @@ class MainWindow(QMainWindow):
             self.btn_board_toggle.setText("♟ Board: OFF")
             self.btn_board_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #9CA3AF;
-                    border: 1px solid #374151;
-                    border-radius: 5px;
+                    background-color: rgba(255, 255, 255, 0.04);
+                    color: #64748B;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
                     font-weight: 600;
                 }
                 QPushButton:hover {
-                    color: #EDEDED;
-                    background-color: #2D303B;
+                    color: #94A3B8;
+                    background-color: rgba(255, 255, 255, 0.08);
                 }
             """)
             if self._is_compact_mode:
@@ -668,16 +675,16 @@ class MainWindow(QMainWindow):
             self.btn_compact_toggle.setToolTip("Expand to full board view (C)")
             self.btn_compact_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #E0E7FF;
-                    border: 1px solid #4338CA;
-                    border-radius: 5px;
+                    background-color: rgba(168, 85, 247, 0.16);
+                    color: #D8B4FE;
+                    border: 1px solid rgba(168, 85, 247, 0.45);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
-                    font-weight: 600;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #312E81;
+                    background-color: rgba(168, 85, 247, 0.28);
                     color: #FFFFFF;
                 }
             """)
@@ -692,16 +699,16 @@ class MainWindow(QMainWindow):
             self.btn_compact_toggle.setToolTip("Shrink to sleek floating HUD (C)")
             self.btn_compact_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #93C5FD;
-                    border: 1px solid #2563EB;
-                    border-radius: 5px;
+                    background-color: rgba(168, 85, 247, 0.14);
+                    color: #C084FC;
+                    border: 1px solid rgba(168, 85, 247, 0.35);
+                    border-radius: 8px;
                     padding: 5px 10px;
                     font-size: 11px;
-                    font-weight: 600;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #1E3A8A;
+                    background-color: rgba(168, 85, 247, 0.24);
                     color: #FFFFFF;
                 }
             """)
@@ -744,7 +751,7 @@ class MainWindow(QMainWindow):
         if incident_path:
             name = incident_path.name
             self.sync_pill.setText(f"🚩 Incident saved: {name}")
-            self.sync_pill.setStyleSheet("background-color: #7F1D1D; color: #FCA5A5; border-left: 4px solid #EF4444; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
+            self.sync_pill.setStyleSheet("background-color: rgba(255, 42, 133, 0.20); color: #FF2A85; border-left: 3px solid #FF2A85; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
             QTimer.singleShot(3500, self._on_game_state_changed)
         else:
             self.sync_pill.setText("Buffer empty (no frames)")
@@ -760,7 +767,7 @@ class MainWindow(QMainWindow):
                     self.game_state_mgr.live_board
                 )
             self.sync_pill.setText("↩ Undid last move")
-            self.sync_pill.setStyleSheet("background-color: #1E3A8A; color: #93C5FD; border-left: 4px solid #3B82F6; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
+            self.sync_pill.setStyleSheet("background-color: rgba(0, 240, 255, 0.20); color: #00F0FF; border-left: 3px solid #00F0FF; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
             QTimer.singleShot(2500, self._on_game_state_changed)
 
     def _connect_signals(self) -> None:
@@ -778,17 +785,16 @@ class MainWindow(QMainWindow):
             self.btn_side_toggle.setToolTip("Playing as White (White at bottom). Click or press F to switch to Black")
             self.btn_side_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2430;
-                    color: #FFFFFF;
-                    border: 1px solid #3B82F6;
-                    border-radius: 5px;
-                    padding: 5px 8px;
+                    background-color: rgba(255, 255, 255, 0.08);
+                    color: #F8FAFC;
+                    border: 1px solid rgba(255, 255, 255, 0.20);
+                    border-radius: 8px;
+                    padding: 5px 10px;
                     font-size: 11px;
                     font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #2D3748;
-                    border-color: #60A5FA;
+                    background-color: rgba(255, 255, 255, 0.14);
                 }
             """)
         else:
@@ -796,17 +802,16 @@ class MainWindow(QMainWindow):
             self.btn_side_toggle.setToolTip("Playing as Black (Black at bottom). Click or press F to switch to White")
             self.btn_side_toggle.setStyleSheet("""
                 QPushButton {
-                    background-color: #2B1D0F;
-                    color: #FCD34D;
-                    border: 1px solid #D97706;
-                    border-radius: 5px;
-                    padding: 5px 8px;
+                    background-color: rgba(168, 85, 247, 0.14);
+                    color: #C084FC;
+                    border: 1px solid rgba(168, 85, 247, 0.40);
+                    border-radius: 8px;
+                    padding: 5px 10px;
                     font-size: 11px;
                     font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #3D2814;
-                    border-color: #F59E0B;
+                    background-color: rgba(168, 85, 247, 0.24);
                 }
             """)
 
@@ -824,16 +829,16 @@ class MainWindow(QMainWindow):
             time_diff = int(time.time() - self.game_state_mgr.last_sync_time)
             time_txt = f"{time_diff}s ago" if time_diff > 0 else "just now"
             self.sync_pill.setText(f"Synchronized ({time_txt})")
-            self.sync_pill.setStyleSheet("background-color: #064E3B; color: #34D399; border-left: 4px solid #10B981; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
+            self.sync_pill.setStyleSheet("background-color: rgba(0, 255, 157, 0.14); color: #00FF9D; border-left: 3px solid #00FF9D; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
         elif status == SyncStatus.SYNCHRONIZING:
             self.sync_pill.setText("Synchronizing...")
-            self.sync_pill.setStyleSheet("background-color: #451A03; color: #FCD34D; border-left: 4px solid #F59E0B; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
+            self.sync_pill.setStyleSheet("background-color: rgba(255, 184, 0, 0.14); color: #FFB800; border-left: 3px solid #FFB800; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
         elif status == SyncStatus.POSITION_UNCERTAIN:
             self.sync_pill.setText("Position uncertain")
-            self.sync_pill.setStyleSheet("background-color: #431407; color: #FB923C; border-left: 4px solid #EA580C; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
+            self.sync_pill.setStyleSheet("background-color: rgba(255, 42, 133, 0.14); color: #FF2A85; border-left: 3px solid #FF2A85; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 700;")
         else:
             self.sync_pill.setText("Moves tab unavailable")
-            self.sync_pill.setStyleSheet("background-color: #27272A; color: #A1A1AA; border-left: 4px solid #71717A; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
+            self.sync_pill.setStyleSheet("background-color: rgba(255, 255, 255, 0.04); color: #94A3B8; border-left: 3px solid #64748B; border-radius: 8px; padding: 5px 12px; font-size: 11px; font-weight: 600;")
 
     def _refresh_sync_pill_time(self) -> None:
         if self.game_state_mgr.sync_status == SyncStatus.SYNCHRONIZED:

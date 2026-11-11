@@ -48,30 +48,59 @@ class OpponentView(QWidget):
         left_layout.setSpacing(8)
 
         lbl_list = QLabel("Opponent Profiles")
-        lbl_list.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
+        lbl_list.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
         left_layout.addWidget(lbl_list)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search opponents...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 7px 10px;
+            }
+            QLineEdit:focus {
+                border-color: #00F0FF;
+            }
+        """)
         self.search_input.textChanged.connect(self._on_search_changed)
         left_layout.addWidget(self.search_input)
 
         self.opp_list_widget = QListWidget()
+        self.opp_list_widget.setStyleSheet("""
+            QListWidget {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+                color: #F8FAFC;
+                padding: 4px;
+            }
+            QListWidget::item {
+                border-radius: 6px;
+                padding: 6px 8px;
+            }
+            QListWidget::item:selected {
+                background-color: rgba(0, 240, 255, 0.20);
+                color: #00F0FF;
+            }
+        """)
         self.opp_list_widget.itemClicked.connect(self._on_opponent_selected)
         left_layout.addWidget(self.opp_list_widget, stretch=1)
 
         btn_new_opp = QPushButton("+ New Opponent")
         btn_new_opp.setStyleSheet("""
             QPushButton {
-                background-color: #1F2127;
-                color: #60A5FA;
-                font-weight: 600;
-                padding: 7px;
-                border: 1px solid #2B2D35;
-                border-radius: 5px;
+                background-color: rgba(0, 240, 255, 0.12);
+                color: #00F0FF;
+                font-weight: 700;
+                padding: 8px;
+                border: 1px solid rgba(0, 240, 255, 0.35);
+                border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #2D303B;
+                background-color: rgba(0, 240, 255, 0.22);
             }
         """)
         btn_new_opp.clicked.connect(self._create_new_opponent)
@@ -88,28 +117,41 @@ class OpponentView(QWidget):
         # Header Info Row
         header_row = QHBoxLayout()
         self.lbl_profile_name = QLabel("Select an opponent")
-        self.lbl_profile_name.setStyleSheet("font-size: 18px; font-weight: 700; color: #FFFFFF;")
+        self.lbl_profile_name.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         header_row.addWidget(self.lbl_profile_name)
         header_row.addStretch()
 
         self.btn_import_pgn = QPushButton("Import PGN Game")
         self.btn_import_pgn.setStyleSheet("""
             QPushButton {
-                background-color: #2563EB;
-                color: #FFFFFF;
-                font-weight: 500;
-                padding: 6px 12px;
-                border-radius: 5px;
+                background-color: #00F0FF;
+                color: #080B12;
+                font-weight: 800;
+                padding: 7px 16px;
+                border-radius: 8px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #1D4ED8;
+                background-color: #38BDF8;
             }
         """)
         self.btn_import_pgn.clicked.connect(self._import_pgn_for_opponent)
         header_row.addWidget(self.btn_import_pgn)
 
         self.btn_delete_opp = QPushButton("Delete Profile")
-        self.btn_delete_opp.setStyleSheet("background-color: #311313; color: #EF4444; border: 1px solid #7F1D1D; padding: 6px 12px; border-radius: 5px;")
+        self.btn_delete_opp.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 42, 133, 0.12);
+                color: #FF2A85;
+                border: 1px solid rgba(255, 42, 133, 0.35);
+                padding: 7px 14px;
+                border-radius: 8px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 42, 133, 0.22);
+            }
+        """)
         self.btn_delete_opp.clicked.connect(self._delete_opponent)
         header_row.addWidget(self.btn_delete_opp)
 

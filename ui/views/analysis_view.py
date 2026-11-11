@@ -51,27 +51,27 @@ class AnalysisView(QWidget):
         self.variation_banner = QFrame()
         self.variation_banner.setStyleSheet("""
             QFrame {
-                background-color: #312E81;
-                border: 1px solid #4338CA;
-                border-radius: 6px;
-                padding: 6px 12px;
+                background-color: rgba(168, 85, 247, 0.16);
+                border: 1px solid rgba(168, 85, 247, 0.40);
+                border-radius: 10px;
+                padding: 6px 14px;
             }
             QLabel {
-                color: #C7D2FE;
+                color: #E9D5FF;
                 font-size: 12px;
-                font-weight: 600;
+                font-weight: 700;
             }
             QPushButton {
-                background-color: #4F46E5;
-                color: #FFFFFF;
+                background-color: #A855F7;
+                color: #080B12;
                 border: none;
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-weight: 600;
+                border-radius: 6px;
+                padding: 4px 12px;
+                font-weight: 800;
                 font-size: 11px;
             }
             QPushButton:hover {
-                background-color: #4338CA;
+                background-color: #C084FC;
             }
         """)
         var_layout = QHBoxLayout(self.variation_banner)
@@ -99,21 +99,38 @@ class AnalysisView(QWidget):
         self.ctrl_row_widget = QWidget()
         ctrl_row = QHBoxLayout(self.ctrl_row_widget)
         ctrl_row.setContentsMargins(0, 0, 0, 0)
-        ctrl_row.setSpacing(6)
+        ctrl_row.setSpacing(8)
+
+        btn_style = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
+            }
+        """
 
         self.btn_flip = QPushButton("Flip Board ⟲")
-        self.btn_flip.setStyleSheet("background-color: #1F2127; color: #D1D5DB; border: 1px solid #2B2D35; border-radius: 5px; padding: 5px 10px;")
+        self.btn_flip.setStyleSheet(btn_style)
         self.btn_flip.clicked.connect(self._on_flip_board)
         ctrl_row.addWidget(self.btn_flip)
 
         self.btn_reset_pos = QPushButton("⚡ Position...")
         self.btn_reset_pos.setToolTip("Set starting position (White/Black, FEN, or common openings)")
-        self.btn_reset_pos.setStyleSheet("background-color: #1F2127; color: #D1D5DB; border: 1px solid #2B2D35; border-radius: 5px; padding: 5px 10px;")
+        self.btn_reset_pos.setStyleSheet(btn_style)
         self.btn_reset_pos.clicked.connect(self._open_position_dialog)
         ctrl_row.addWidget(self.btn_reset_pos)
 
         self.btn_toggle_arrows = QPushButton("Arrows ✓")
-        self.btn_toggle_arrows.setStyleSheet("background-color: #1F2127; color: #D1D5DB; border: 1px solid #2B2D35; border-radius: 5px; padding: 5px 10px;")
+        self.btn_toggle_arrows.setStyleSheet(btn_style)
         self.btn_toggle_arrows.clicked.connect(self._toggle_arrows)
         ctrl_row.addWidget(self.btn_toggle_arrows)
 
@@ -125,7 +142,13 @@ class AnalysisView(QWidget):
         # ---------------- RIGHT: MOVE ANALYSIS & COACH TAKEAWAY ----------------
         self.analysis_container = QFrame()
         self.analysis_container.setObjectName("AnalysisContainer")
-        self.analysis_container.setStyleSheet("background-color: #16171B; border: 1px solid #23252B; border-radius: 8px;")
+        self.analysis_container.setStyleSheet("""
+            QFrame#AnalysisContainer {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 16px;
+            }
+        """)
         self.analysis_layout = QVBoxLayout(self.analysis_container)
         self.analysis_layout.setContentsMargins(14, 14, 14, 14)
         self.analysis_layout.setSpacing(10)
@@ -134,20 +157,21 @@ class AnalysisView(QWidget):
         self.coach_card = QFrame()
         self.coach_card.setStyleSheet("""
             QFrame {
-                background-color: #181F2C;
-                border-left: 3px solid #3B82F6;
-                border-radius: 6px;
+                background-color: rgba(0, 240, 255, 0.08);
+                border: 1px solid rgba(0, 240, 255, 0.35);
+                border-left: 4px solid #00F0FF;
+                border-radius: 12px;
                 padding: 10px;
             }
         """)
         coach_layout = QVBoxLayout(self.coach_card)
-        coach_layout.setContentsMargins(6, 4, 6, 4)
+        coach_layout.setContentsMargins(8, 6, 8, 6)
         coach_layout.setSpacing(4)
         self.lbl_coach = QLabel("● WHITE TO MOVE")
-        self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #60A5FA; letter-spacing: 0.5px;")
+        self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #00F0FF; letter-spacing: 0.8px;")
         self.coach_text = QLabel("Awaiting engine calculation...")
         self.coach_text.setWordWrap(True)
-        self.coach_text.setStyleSheet("font-size: 13px; color: #E0E7FF; line-height: 1.4;")
+        self.coach_text.setStyleSheet("font-size: 13px; color: #F8FAFC; line-height: 1.4;")
         coach_layout.addWidget(self.lbl_coach)
         coach_layout.addWidget(self.coach_text)
         self.analysis_layout.addWidget(self.coach_card)
@@ -308,11 +332,11 @@ class AnalysisView(QWidget):
             self.lbl_coach.setText("LIVE OBSERVATION")
             self.coach_card.setStyleSheet("""
                 QFrame {
-                    background-color: #181F2C;
-                    border: 1px solid #2B2D35;
-                    border-left: 4px solid #60A5FA;
-                    border-radius: 6px;
-                    padding: 8px 10px;
+                    background-color: rgba(0, 240, 255, 0.08);
+                    border: 1px solid rgba(0, 240, 255, 0.35);
+                    border-left: 4px solid #00F0FF;
+                    border-radius: 12px;
+                    padding: 8px 12px;
                 }
             """)
             self.coach_text.setText("Engine move recommendations are disabled during Live Observation to preserve Fair-Play compliance.")
@@ -332,14 +356,14 @@ class AnalysisView(QWidget):
         if board.is_checkmate():
             winner = "Black" if turn == chess.WHITE else "White"
             self.lbl_coach.setText(f"CHECKMATE — {winner.upper()} WINS!")
-            self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #EF4444; letter-spacing: 0.6px;")
+            self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #FF2A85; letter-spacing: 0.8px;")
             self.coach_card.setStyleSheet("""
                 QFrame {
-                    background-color: #2D1515;
-                    border: 1px solid #DC2626;
-                    border-left: 5px solid #EF4444;
-                    border-radius: 6px;
-                    padding: 8px 10px;
+                    background-color: rgba(255, 42, 133, 0.14);
+                    border: 1px solid rgba(255, 42, 133, 0.40);
+                    border-left: 4px solid #FF2A85;
+                    border-radius: 12px;
+                    padding: 8px 12px;
                 }
             """)
             self.coach_text.setText(f"Game over by checkmate ({winner} wins).")
@@ -350,14 +374,14 @@ class AnalysisView(QWidget):
             return
         elif board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
             self.lbl_coach.setText("DRAW / STALEMATE")
-            self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #A1A1AA; letter-spacing: 0.6px;")
+            self.lbl_coach.setStyleSheet("font-size: 11px; font-weight: 800; color: #94A3B8; letter-spacing: 0.8px;")
             self.coach_card.setStyleSheet("""
                 QFrame {
-                    background-color: #27272A;
-                    border: 1px solid #52525B;
-                    border-left: 5px solid #71717A;
-                    border-radius: 6px;
-                    padding: 8px 10px;
+                    background-color: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.10);
+                    border-left: 4px solid #94A3B8;
+                    border-radius: 12px;
+                    padding: 8px 12px;
                 }
             """)
             self.coach_text.setText("Game drawn.")
@@ -369,14 +393,14 @@ class AnalysisView(QWidget):
 
         if turn == chess.WHITE:
             turn_name = "WHITE TO MOVE"
-            badge_color = "#38BDF8"  # High-contrast Sky Blue
-            bg_color = "#0C2340"
-            border_color = "#0284C7"
+            badge_color = "#00F0FF"  # Electric Cyan
+            bg_color = "rgba(0, 240, 255, 0.08)"
+            border_color = "rgba(0, 240, 255, 0.35)"
         else:
             turn_name = "BLACK TO MOVE"
-            badge_color = "#FBBF24"  # High-contrast Amber
-            bg_color = "#331E05"
-            border_color = "#D97706"
+            badge_color = "#A855F7"  # Neon Violet
+            bg_color = "rgba(168, 85, 247, 0.08)"
+            border_color = "rgba(168, 85, 247, 0.35)"
 
         check_str = " (CHECK!)" if board.is_check() else ""
 
@@ -393,14 +417,14 @@ class AnalysisView(QWidget):
                 badge_title = f"● OPPONENT'S TURN [{turn_name}]{check_str}  ➔  Waiting for move..."
 
         self.lbl_coach.setText(badge_title)
-        self.lbl_coach.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {badge_color}; letter-spacing: 0.5px;")
+        self.lbl_coach.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {badge_color}; letter-spacing: 0.8px;")
         self.coach_card.setStyleSheet(f"""
             QFrame {{
                 background-color: {bg_color};
                 border: 1px solid {border_color};
-                border-left: 5px solid {badge_color};
-                border-radius: 6px;
-                padding: 8px 10px;
+                border-left: 4px solid {badge_color};
+                border-radius: 12px;
+                padding: 8px 12px;
             }}
         """)
 

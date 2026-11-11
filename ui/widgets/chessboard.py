@@ -170,15 +170,24 @@ class ChessboardWidget(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
         bx, by, b_size, sq_size = self._get_board_geometry()
+        board_rect = QRectF(bx, by, b_size, b_size)
 
-        # 1. Background board container
-        painter.fillRect(self.rect(), QColor("#121316"))
+        # 1. Background board container - deep obsidian
+        painter.fillRect(self.rect(), QColor("#080B12"))
 
-        # 2. Draw Squares
-        light_color = QColor("#D1D5DB")
-        dark_color = QColor("#4B5563")
-        last_move_color = QColor(253, 224, 71, 75)
-        selected_color = QColor(56, 189, 248, 100)
+        # Clip board squares to a sleek 12px squircle
+        painter.save()
+        board_clip = QPainterPath()
+        board_clip.addRoundedRect(board_rect, 12, 12)
+        painter.setClipPath(board_clip)
+
+        # 2. Draw Squares - Frosted glass light squares and smoked indigo dark squares
+        light_color = QColor(255, 255, 255, 38)
+        dark_color = QColor(15, 23, 42, 165)
+        last_move_fill = QColor(168, 85, 247, 75)
+        last_move_border = QColor(168, 85, 247, 180)
+        selected_fill = QColor(0, 240, 255, 80)
+        selected_border = QColor(0, 240, 255, 180)
 
         for col in range(8):
             for row in range(8):
@@ -194,41 +203,25 @@ class ChessboardWidget(QWidget):
                 is_light = (chess.square_file(sq) + chess.square_rank(sq)) % 2 != 0
                 painter.fillRect(rect, light_color if is_light else dark_color)
 
-                # Last move highlight
+                # Last move highlight - Neon Violet wash + inner border
                 if self._last_move and sq in [self._last_move.from_square, self._last_move.to_square]:
-                    painter.fillRect(rect, last_move_color)
+                    painter.fillRect(rect, last_move_fill)
+                    painter.setPen(QPen(last_move_border, 1.5))
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawRect(rect.adjusted(0.75, 0.75, -0.75, -0.75))
 
-                # Live move synchronization flash
+                # Live move synchronization flash - Neon Emerald
                 if sq in self._flash_squares and self._flash_alpha > 0:
-                    painter.fillRect(rect, QColor(52, 211, 153, self._flash_alpha))
+                    painter.fillRect(rect, QColor(0, 255, 157, self._flash_alpha))
 
-                # Selected square highlight
+                # Selected square highlight - Neon Cyan wash + inner border
                 if self._selected_square == sq:
-                    painter.fillRect(rect, selected_color)
+                    painter.fillRect(rect, selected_fill)
+                    painter.setPen(QPen(selected_border, 1.5))
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawRect(rect.adjusted(0.75, 0.75, -0.75, -0.75))
 
-        # 3. Draw Coordinates
-        if self._show_coordinates:
-            font = QFont("Segoe UI", int(max(9, sq_size * 0.18)), QFont.Bold)
-            painter.setFont(font)
-            coord_pen = QPen(QColor("#9CA3AF"))
-            painter.setPen(coord_pen)
-
-            files = ["a", "b", "c", "d", "e", "f", "g", "h"] if self._white_at_bottom else ["h", "g", "f", "e", "d", "c", "b", "a"]
-            ranks = ["8", "7", "6", "5", "4", "3", "2", "1"] if self._white_at_bottom else ["1", "2", "3", "4", "5", "6", "7", "8"]
-
-            # Files along bottom
-            for col, f_txt in enumerate(files):
-                x = bx + (col * sq_size)
-                y = by + b_size + 14
-                painter.drawText(QRectF(x, y - 10, sq_size, 20), Qt.AlignCenter, f_txt)
-
-            # Ranks along left
-            for row, r_txt in enumerate(ranks):
-                x = bx - 18
-                y = by + (row * sq_size)
-                painter.drawText(QRectF(x, y, 16, sq_size), Qt.AlignCenter, r_txt)
-
-        # 4. Draw Pieces
+        # 4. Draw Pieces inside the clipped squircle
         for sq in chess.SQUARES:
             piece = self._board.piece_at(sq)
             if piece:
@@ -244,8 +237,8 @@ class ChessboardWidget(QWidget):
         # 5. Draw Legal Move Hints
         if self._show_legal_moves and self._selected_square is not None:
             painter.setPen(Qt.NoPen)
-            hint_color = QColor(16, 185, 129, 140)
-            capture_color = QColor(239, 68, 68, 140)
+            hint_color = QColor(0, 240, 255, 190)   # Neon Cyan
+            capture_color = QColor(255, 42, 133, 190) # Neon Rose
 
             for m in self._legal_moves_for_selected:
                 to_sq = m.to_square
@@ -267,12 +260,43 @@ class ChessboardWidget(QWidget):
                     dot_radius = sq_size * 0.16
                     painter.drawEllipse(QPointF(cx, cy), dot_radius, dot_radius)
 
+        painter.restore()
+
+        # Specular glass border outline around board container
+        specular_pen = QPen(QColor(255, 255, 255, 45), 1.5)
+        painter.setPen(specular_pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRoundedRect(board_rect, 12, 12)
+
+        # 3. Draw Coordinates
+        if self._show_coordinates:
+            font = QFont("Segoe UI Variable Display", int(max(9, sq_size * 0.18)), QFont.Bold)
+            font.setStyleHint(QFont.SansSerif)
+            painter.setFont(font)
+            coord_pen = QPen(QColor("#94A3B8"))
+            painter.setPen(coord_pen)
+
+            files = ["a", "b", "c", "d", "e", "f", "g", "h"] if self._white_at_bottom else ["h", "g", "f", "e", "d", "c", "b", "a"]
+            ranks = ["8", "7", "6", "5", "4", "3", "2", "1"] if self._white_at_bottom else ["1", "2", "3", "4", "5", "6", "7", "8"]
+
+            # Files along bottom
+            for col, f_txt in enumerate(files):
+                x = bx + (col * sq_size)
+                y = by + b_size + 14
+                painter.drawText(QRectF(x, y - 10, sq_size, 20), Qt.AlignCenter, f_txt)
+
+            # Ranks along left
+            for row, r_txt in enumerate(ranks):
+                x = bx - 18
+                y = by + (row * sq_size)
+                painter.drawText(QRectF(x, y, 16, sq_size), Qt.AlignCenter, r_txt)
+
         # 6. Draw Candidate Move Arrows
         if self._show_arrows and self._candidate_moves:
             base_colors = [
-                QColor(16, 185, 129),   # 1st: Emerald
-                QColor(59, 130, 246),   # 2nd: Blue
-                QColor(245, 158, 11)    # 3rd: Amber
+                QColor("#00F0FF"),   # 1st: Neon Cyan
+                QColor("#A855F7"),   # 2nd: Neon Violet
+                QColor("#00FF9D")    # 3rd: Neon Emerald
             ]
             for idx, cand in enumerate(self._candidate_moves[:3]):
                 rank = idx + 1
@@ -287,16 +311,16 @@ class ChessboardWidget(QWidget):
                     color.setAlpha(65)
                     scale = 0.85
                 else:
-                    color.setAlpha(210)
+                    color.setAlpha(220)
                     scale = 1.0
 
                 self._draw_arrow(painter, cand.move.from_square, cand.move.to_square, bx, by, sq_size, color, scale_mult=scale, glow=is_hovered)
 
-        # 7. Draw Threat Arrows
+        # 7. Draw Threat Arrows - Neon Rose
         if self._show_arrows and self._threat_arrows:
-            threat_color = QColor(239, 68, 68, 190)
+            threat_color = QColor(255, 42, 133, 220)
             for from_sq, to_sq in self._threat_arrows:
-                self._draw_arrow(painter, from_sq, to_sq, bx, by, sq_size, threat_color)
+                self._draw_arrow(painter, from_sq, to_sq, bx, by, sq_size, threat_color, glow=True)
 
         painter.end()
 
@@ -334,10 +358,10 @@ class ChessboardWidget(QWidget):
 
         painter.save()
 
-        if glow:
-            glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), 75), shaft_width + 8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-            painter.setPen(glow_pen)
-            painter.drawLine(QPointF(x1, y1), QPointF(base_x, base_y))
+        glow_alpha = 95 if glow else 55
+        glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), shaft_width + 6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        painter.setPen(glow_pen)
+        painter.drawLine(QPointF(x1, y1), QPointF(base_x, base_y))
 
         pen = QPen(color, shaft_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         painter.setPen(pen)
@@ -354,6 +378,13 @@ class ChessboardWidget(QWidget):
             QPointF(left_x, left_y),
             QPointF(right_x, right_y)
         ])
+        
+        # Glow pass for arrow head
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), glow_alpha)))
+        painter.setPen(QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), 3, Qt.SolidLine, Qt.RoundJoin))
+        painter.drawPolygon(arrow_head)
+
+        # Core arrow head
         painter.setBrush(QBrush(color))
         painter.setPen(Qt.NoPen)
         painter.drawPolygon(arrow_head)

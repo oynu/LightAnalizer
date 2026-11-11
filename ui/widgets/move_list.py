@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QHeaderView, QPushButton, QLabel
 )
+from PySide6.QtGui import QColor, QFont, QBrush
 from PySide6.QtCore import Qt
 
 class MoveListWidget(QWidget):
@@ -44,7 +45,7 @@ class MoveListWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        # Move table
+        # Move table styled as subtle liquid glass
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["#", "White", "Black"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -53,12 +54,41 @@ class MoveListWidget(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectItems)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet("""
+            QTableWidget {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+                color: #F8FAFC;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
+                font-size: 12px;
+                padding: 4px;
+            }
+            QTableWidget::item {
+                border-radius: 6px;
+                padding: 4px 6px;
+            }
+            QTableWidget::item:selected {
+                background-color: rgba(0, 240, 255, 0.22);
+                color: #00F0FF;
+            }
+            QHeaderView::section {
+                background-color: rgba(255, 255, 255, 0.06);
+                color: #94A3B8;
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+                padding: 6px;
+                font-weight: 700;
+                font-size: 11px;
+            }
+        """)
         self.table.cellClicked.connect(self._on_cell_clicked)
         layout.addWidget(self.table)
 
-        # Navigation Controls Row
+        # Navigation Controls Row with liquid glass buttons
         nav_row = QHBoxLayout()
-        nav_row.setSpacing(4)
+        nav_row.setSpacing(6)
 
         btn_start = QPushButton("⏮")
         btn_back = QPushButton("◀")
@@ -66,19 +96,23 @@ class MoveListWidget(QWidget):
         btn_end = QPushButton("⏭")
 
         for b in [btn_start, btn_back, btn_fwd, btn_end]:
-            b.setFixedWidth(36)
+            b.setFixedWidth(38)
             b.setStyleSheet("""
                 QPushButton {
-                    background-color: #1F2127;
-                    color: #D1D5DB;
-                    border: 1px solid #2B2D35;
-                    border-radius: 4px;
-                    padding: 4px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #F8FAFC;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 5px;
                     font-size: 13px;
                 }
                 QPushButton:hover {
-                    background-color: #2D303B;
-                    color: #FFFFFF;
+                    background-color: rgba(0, 240, 255, 0.16);
+                    border: 1px solid rgba(0, 240, 255, 0.40);
+                    color: #00F0FF;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(0, 240, 255, 0.25);
                 }
             """)
 
@@ -100,11 +134,19 @@ class MoveListWidget(QWidget):
         num_moves = (len(moves_san) + 1) // 2
         self.table.setRowCount(num_moves)
 
+        active_bg = QColor(0, 240, 255, 45)
+        active_fg = QColor("#00F0FF")
+        muted_fg = QColor("#64748B")
+        normal_fg = QColor("#F8FAFC")
+        font_mono = QFont("JetBrains Mono", 10)
+        font_mono_bold = QFont("JetBrains Mono", 10, QFont.Bold)
+
         for i in range(num_moves):
             # Move number
             num_item = QTableWidgetItem(f"{i+1}.")
             num_item.setTextAlignment(Qt.AlignCenter)
-            num_item.setForeground(Qt.gray)
+            num_item.setForeground(muted_fg)
+            num_item.setFont(font_mono)
             self.table.setItem(i, 0, num_item)
 
             # White move
@@ -113,7 +155,12 @@ class MoveListWidget(QWidget):
                 w_item = QTableWidgetItem(moves_san[white_idx])
                 w_item.setTextAlignment(Qt.AlignCenter)
                 if current_ply == white_idx + 1:
-                    w_item.setBackground(Qt.darkBlue)
+                    w_item.setBackground(active_bg)
+                    w_item.setForeground(active_fg)
+                    w_item.setFont(font_mono_bold)
+                else:
+                    w_item.setForeground(normal_fg)
+                    w_item.setFont(font_mono)
                 self.table.setItem(i, 1, w_item)
 
             # Black move
@@ -122,7 +169,12 @@ class MoveListWidget(QWidget):
                 b_item = QTableWidgetItem(moves_san[black_idx])
                 b_item.setTextAlignment(Qt.AlignCenter)
                 if current_ply == black_idx + 1:
-                    b_item.setBackground(Qt.darkBlue)
+                    b_item.setBackground(active_bg)
+                    b_item.setForeground(active_fg)
+                    b_item.setFont(font_mono_bold)
+                else:
+                    b_item.setForeground(normal_fg)
+                    b_item.setFont(font_mono)
                 self.table.setItem(i, 2, b_item)
             else:
                 self.table.setItem(i, 2, QTableWidgetItem(""))
@@ -130,7 +182,9 @@ class MoveListWidget(QWidget):
         # Auto-scroll to current ply
         if current_ply > 0:
             target_row = (current_ply - 1) // 2
-            self.table.scrollToItem(self.table.item(target_row, 1))
+            item = self.table.item(target_row, 1)
+            if item:
+                self.table.scrollToItem(item)
 
     def _on_cell_clicked(self, row: int, col: int) -> None:
         if col == 1:

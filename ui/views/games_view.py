@@ -44,17 +44,43 @@ class GamesView(QWidget):
         # Header Row
         header_row = QHBoxLayout()
         title = QLabel("Game History & PGN Library")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #FFFFFF;")
+        title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         header_row.addWidget(title)
         header_row.addStretch()
 
         self.btn_import_pgn = QPushButton("Import PGN...")
-        self.btn_import_pgn.setStyleSheet("background-color: #2563EB; color: #FFFFFF; padding: 7px 14px; border-radius: 5px; font-weight: 500;")
+        self.btn_import_pgn.setStyleSheet("""
+            QPushButton {
+                background-color: #00F0FF;
+                color: #080B12;
+                padding: 7px 16px;
+                border-radius: 8px;
+                font-weight: 800;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #38BDF8;
+            }
+        """)
         self.btn_import_pgn.clicked.connect(self._import_pgn_file)
         header_row.addWidget(self.btn_import_pgn)
 
         self.btn_export_curr = QPushButton("Export Active Game PGN")
-        self.btn_export_curr.setStyleSheet("background-color: #1F2127; color: #EDEDED; border: 1px solid #2B2D35; padding: 7px 14px; border-radius: 5px;")
+        self.btn_export_curr.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                padding: 7px 16px;
+                border-radius: 8px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 240, 255, 0.14);
+                border-color: rgba(0, 240, 255, 0.35);
+                color: #00F0FF;
+            }
+        """)
         self.btn_export_curr.clicked.connect(self._export_active_game)
         header_row.addWidget(self.btn_export_curr)
 
@@ -64,6 +90,18 @@ class GamesView(QWidget):
         filter_row = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Filter games by player, ECO, or opening...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #F8FAFC;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 8px 12px;
+            }
+            QLineEdit:focus {
+                border-color: #00F0FF;
+            }
+        """)
         self.search_input.textChanged.connect(self._filter_games)
         filter_row.addWidget(self.search_input)
         layout.addLayout(filter_row)
@@ -75,13 +113,51 @@ class GamesView(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet("""
+            QTableWidget {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                color: #F8FAFC;
+                padding: 4px;
+            }
+            QTableWidget::item {
+                border-radius: 6px;
+                padding: 6px 8px;
+            }
+            QTableWidget::item:selected {
+                background-color: rgba(0, 240, 255, 0.20);
+                color: #00F0FF;
+            }
+            QHeaderView::section {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #94A3B8;
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+                padding: 8px;
+                font-weight: 700;
+            }
+        """)
         self.table.cellDoubleClicked.connect(self._on_row_double_clicked)
         layout.addWidget(self.table, stretch=1)
 
         # Bottom Actions Row
         actions_row = QHBoxLayout()
         self.btn_load_game = QPushButton("Load Selected Game to Board")
-        self.btn_load_game.setStyleSheet("background-color: #10B981; color: #FFFFFF; padding: 8px 16px; border-radius: 6px; font-weight: 600;")
+        self.btn_load_game.setStyleSheet("""
+            QPushButton {
+                background-color: #00FF9D;
+                color: #080B12;
+                padding: 8px 18px;
+                border-radius: 8px;
+                font-weight: 800;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #34D399;
+            }
+        """)
         self.btn_load_game.clicked.connect(self._load_selected_game)
         actions_row.addWidget(self.btn_load_game)
         actions_row.addStretch()
