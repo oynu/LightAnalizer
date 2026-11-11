@@ -183,7 +183,7 @@ def test_game_state_manager_brilliant_counter():
     analyzer = ChessAnalyzer()
     gsm = GameStateManager(board_state, engine_mgr, analyzer)
     gsm.set_brilliant_mode(True)
-    assert gsm.engine_mgr.config.multipv == 6
+    assert gsm.engine_mgr.config.multipv == 8
     assert gsm.brilliant_count == 0
 
     # Greek gift position

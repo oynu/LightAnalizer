@@ -52,6 +52,13 @@ class EngineManager:
         self._is_active = False
         self._on_result_callbacks: List[Callable[[str, List[CandidateMove]], None]] = []
         self._on_error_callbacks: List[Callable[[str], None]] = []
+        # FEN of the last position whose search fully completed (used to know when
+        # candidates are final / stable, e.g. before auto-playing a move).
+        self.last_final_fen: Optional[str] = None
+        # Optional provider returning extra root moves (e.g. sacrifices) that should be
+        # probed after the main MultiPV search so they can be evaluated by the engine.
+        self.probe_moves_provider: Optional[Callable[[chess.Board, List[chess.Move]], List[chess.Move]]] = None
+        self.probe_time_limit_sec: float = 0.9
 
     def add_result_callback(self, cb: Callable[[str, List[CandidateMove]], None]) -> None:
         if cb not in self._on_result_callbacks:
@@ -156,6 +163,7 @@ class EngineManager:
             if not self.start_engine():
                 # Fallback to heuristic candidate evaluation if engine not available
                 candidates = self._fallback_evaluate(board)
+                self.last_final_fen = fen
                 self._dispatch_result(fen, candidates, search_id, on_complete)
                 return
 
@@ -219,6 +227,11 @@ class EngineManager:
             if multipv_dict:
                 sorted_infos = [multipv_dict[k] for k in sorted(multipv_dict.keys())]
                 candidates = self._parse_engine_results(board, sorted_infos)
+                candidates = self._probe_extra_moves(engine, board, search_id, candidates)
+                with self._lock:
+                    if search_id != self._current_search_id:
+                        return
+                    self.last_final_fen = fen
                 self._dispatch_result(fen, candidates, search_id, on_complete)
 
         except chess.engine.EngineTerminatedError:
@@ -229,16 +242,86 @@ class EngineManager:
         except Exception as e:
             print(f"[EngineManager] Search error: {e}")
             candidates = self._fallback_evaluate(board)
+            self.last_final_fen = fen
             self._dispatch_result(fen, candidates, search_id, on_complete)
+
+    def _probe_extra_moves(
+        self,
+        engine: chess.engine.SimpleEngine,
+        board: chess.Board,
+        search_id: int,
+        candidates: List[CandidateMove]
+    ) -> List[CandidateMove]:
+        """
+        Evaluates extra root moves (e.g. sacrifices) that fell outside the top MultiPV lines
+        and appends them to the candidate list so the Brilliant Farmer can consider them.
+        """
+        provider = self.probe_moves_provider
+        if provider is None or not candidates:
+            return candidates
+        try:
+            known = [c.move for c in candidates]
+            extra = [m for m in provider(board, known) if m not in known and m in board.legal_moves]
+            if not extra:
+                return candidates
+
+            limit = chess.engine.Limit(
+                depth=self.config.depth,
+                time=self.probe_time_limit_sec
+            )
+            probe_dict: Dict[int, Dict[str, Any]] = {}
+            with engine.analysis(board, limit, multipv=len(extra), root_moves=extra) as analysis:
+                with self._lock:
+                    if search_id != self._current_search_id:
+                        analysis.stop()
+                        return candidates
+                    self._active_analysis = analysis
+                for info in analysis:
+                    with self._lock:
+                        if search_id != self._current_search_id:
+                            analysis.stop()
+                            break
+                    if "pv" in info:
+                        probe_dict[info.get("multipv", 1) or 1] = info
+                with self._lock:
+                    if self._active_analysis == analysis:
+                        self._active_analysis = None
+
+            if not probe_dict:
+                return candidates
+
+            best_eval = self._eval_value(candidates[0])
+            probe_infos = [probe_dict[k] for k in sorted(probe_dict.keys())]
+            probed = self._parse_engine_results(
+                board, probe_infos, rank_offset=len(candidates), best_eval_ref=best_eval
+            )
+            for p in probed:
+                p.is_best = False
+            return list(candidates) + probed
+        except chess.engine.EngineTerminatedError:
+            raise
+        except Exception as e:
+            print(f"[EngineManager] Probe error: {e}")
+            return candidates
+
+    @staticmethod
+    def _eval_value(cand: CandidateMove) -> float:
+        if cand.score_cp is not None:
+            return cand.score_cp / 100.0
+        if cand.mate_in is not None:
+            return 100.0 if cand.mate_in > 0 else -100.0
+        return 0.0
 
     def _parse_engine_results(
         self,
         board: chess.Board,
-        results: List[Dict[str, Any]]
+        results: List[Dict[str, Any]],
+        rank_offset: int = 0,
+        best_eval_ref: Optional[float] = None
     ) -> List[CandidateMove]:
         candidates: List[CandidateMove] = []
         turn = board.turn
-        best_score_cp: Optional[float] = None
+        best_score_cp: Optional[float] = best_eval_ref
 
         for idx, entry in enumerate(results):
             pv = entry.get("pv", [])
@@ -278,7 +361,7 @@ class EngineManager:
 
             # Calculate eval difference relative to best move
             current_eval_val = (score_cp / 100.0) if score_cp is not None else (100.0 if (mate_in and mate_in > 0) else -100.0)
-            if idx == 0:
+            if idx == 0 and best_score_cp is None:
                 best_score_cp = current_eval_val
                 eval_diff = 0.0
             else:
@@ -287,14 +370,14 @@ class EngineManager:
             cand = CandidateMove(
                 move=first_move,
                 san=san,
-                rank=idx + 1,
+                rank=idx + 1 + rank_offset,
                 score_cp=score_cp,
                 mate_in=mate_in,
                 eval_str=eval_str,
                 eval_diff=eval_diff,
                 pv=pv,
                 pv_san=pv_san,
-                is_best=(idx == 0)
+                is_best=(idx == 0 and rank_offset == 0)
             )
             candidates.append(cand)
 

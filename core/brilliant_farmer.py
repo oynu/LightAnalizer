@@ -1,7 +1,15 @@
 """
 Brilliant Farmer: Engine-backed detection, discovery, and farming of Brilliant Moves (!!).
 Identifies high-impact material sacrifices that lead to favorable positions, king shelter
-destruction, en prise counter-attacks, Greek Gift sacrifices, gambit breaks, and stalemate traps.
+destruction, en prise counter-attacks, Greek Gift sacrifices, gambit breaks, rook sacrifices
+and stalemate traps.
+
+Pipeline (brilliant mode):
+  1. EngineManager runs a wide MultiPV search, then PROBES sacrifice-shaped root moves
+     (see `probe_moves`) so sacrifices that fall outside the top lines still get an engine score.
+  2. `process_candidates` verifies each sacrifice by replaying the engine PV and measuring the
+     real material deficit once the position is quiet, checks the engine score is still sound
+     (best / near-best / not already completely winning) and promotes the best one to Rank 1.
 """
 from __future__ import annotations
 from typing import List, Optional, Tuple, Dict, Set
@@ -15,8 +23,14 @@ class BrilliantFarmer:
     1. Material sacrifice: Gives up Queen, Rook, Minor piece, or key Pawn, or leaves a piece en prise.
     2. Favorable or winning outcome: Retains solid advantage or positive eval (within reasonable delta).
     3. Non-obvious tactical initiative: King attacks, deflections, line clearances, or counter-blows.
-    4. Not already overwhelmingly trivial (e.g. not +15 cp where any blunder still wins).
+    4. Not already overwhelmingly trivial (e.g. not +7 where any move still wins).
     """
+
+    # Position is "already completely winning" above this engine score (centipawns).
+    CRUSHING_CP = 700
+    # Net material deficit (centipawns) at the end of the verified PV that counts as a real sacrifice.
+    PV_SAC_STRONG = -150
+    PV_SAC_LIGHT = -100
 
     def __init__(self):
         self.gambits = GambitsAndTraps()
@@ -39,6 +53,117 @@ class BrilliantFarmer:
         chess.KING: "king"
     }
 
+    # ------------------------------------------------------------------
+    # Evaluation helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _eval_cp(c: CandidateMove) -> int:
+        """Unified centipawn value of a candidate from the mover's perspective (mates mapped to +/-10000)."""
+        if c.mate_in is not None:
+            return (10000 - abs(c.mate_in)) if c.mate_in > 0 else (-10000 + abs(c.mate_in))
+        return c.score_cp if c.score_cp is not None else 0
+
+    def _material_balance(self, board: chess.Board, color: chess.Color) -> int:
+        total = 0
+        for pt, val in self.PIECE_VALUES.items():
+            if pt == chess.KING:
+                continue
+            total += val * len(board.pieces(pt, color))
+            total -= val * len(board.pieces(pt, not color))
+        return total
+
+    def pv_material_delta(self, board: chess.Board, pv: List[chess.Move]) -> Optional[int]:
+        """
+        Replays the engine PV and returns the mover's net material change (centipawns) at the last
+        QUIET position of the line (no capture / check just played). A strongly negative value means
+        the first move starts a genuine material sacrifice that is not regained inside the PV.
+        Returns None if the PV is unusable / too short to judge.
+        """
+        if not pv or len(pv) < 3:
+            return None
+        mover = board.turn
+        b = board.copy()
+        base = self._material_balance(b, mover)
+        snapshots: List[Tuple[bool, int]] = []
+        for m in pv[:10]:
+            if m not in b.legal_moves:
+                break
+            was_capture = b.is_capture(m)
+            b.push(m)
+            quiet = (not was_capture) and (not b.is_check())
+            snapshots.append((quiet, self._material_balance(b, mover)))
+        if len(snapshots) < 3:
+            return None
+        for quiet, bal in reversed(snapshots):
+            if quiet:
+                return bal - base
+        return snapshots[-1][1] - base
+
+    def is_greek_gift_setup(self, board: chess.Board, move: chess.Move) -> bool:
+        """Strict Greek Gift pattern: Bxh7+/Bxh2+ with knight + queen ready to follow up."""
+        piece = board.piece_at(move.from_square)
+        if not piece or piece.piece_type != chess.BISHOP:
+            return False
+        turn = board.turn
+        if turn == chess.WHITE:
+            target, kings, follow_knight, defend_knight = chess.H7, (chess.G8, chess.H8), (chess.F3, chess.G5), chess.F6
+        else:
+            target, kings, follow_knight, defend_knight = chess.H2, (chess.G1, chess.H1), (chess.F6, chess.G4), chess.F3
+        if move.to_square != target:
+            return False
+        victim = board.piece_at(target)
+        if not victim or victim.piece_type != chess.PAWN or victim.color == turn:
+            return False
+        if board.king(not turn) not in kings:
+            return False
+        my_knight = chess.Piece(chess.KNIGHT, turn)
+        if not any(board.piece_at(s) == my_knight for s in follow_knight):
+            return False
+        if board.piece_at(defend_knight) == chess.Piece(chess.KNIGHT, not turn):
+            return False
+        return len(board.pieces(chess.QUEEN, turn)) > 0
+
+    # ------------------------------------------------------------------
+    # Probing: which sacrifice-shaped root moves should the engine evaluate?
+    # ------------------------------------------------------------------
+    def _probe_priority(self, board: chess.Board, move: chess.Move) -> int:
+        if self.is_greek_gift_setup(board, move):
+            return 100
+        try:
+            if self._is_stalemate_desperado(board, move):
+                return 90
+            is_sac, sac_type, _ = self._is_material_sacrifice(board, move)
+        except Exception:
+            return 0
+        if not is_sac or sac_type.startswith("Counter-Intuitive"):
+            return 0
+        if "Queen" in sac_type:
+            return 80
+        if "King" in sac_type:
+            return 75
+        if "Exchange" in sac_type:
+            return 70
+        if "Bishop" in sac_type or "Knight" in sac_type:
+            return 60
+        if sac_type == "Pawn Sacrifice":
+            return 40
+        return 30
+
+    def probe_moves(self, board: chess.Board, known: List[chess.Move], limit: int = 6) -> List[chess.Move]:
+        """Returns up to `limit` sacrifice-shaped legal moves not already evaluated by MultiPV."""
+        scored: List[Tuple[int, chess.Move]] = []
+        for m in board.legal_moves:
+            if m in known:
+                continue
+            pri = self._probe_priority(board, m)
+            if pri > 0:
+                scored.append((pri, m))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [m for _, m in scored[:limit]]
+
+    # ------------------------------------------------------------------
+    # Candidate processing
+    # ------------------------------------------------------------------
     def process_candidates(
         self,
         board: chess.Board,
@@ -50,6 +175,8 @@ class BrilliantFarmer:
         """
         if not candidates:
             return []
+
+        best_cand = max(candidates, key=self._eval_cp)
 
         # Check known aggressive opening gambits and tactical traps
         gambit_hit = self.gambits.find_gambit_or_trap(board)
@@ -66,7 +193,12 @@ class BrilliantFarmer:
                     found_cand = c
                     break
 
-            if found_cand:
+            # Never push a gambit that the engine considers clearly losing (> 1.3 pawns worse than best)
+            gambit_ok = True
+            if found_cand is not None and (self._eval_cp(best_cand) - self._eval_cp(found_cand)) > 130:
+                gambit_ok = False
+
+            if gambit_ok and found_cand:
                 found_cand.is_brilliant = True
                 found_cand.brilliant_reason = f"{g_name} ({g_sac_type}): {g_idea}"
                 found_cand.rank = 1
@@ -76,7 +208,7 @@ class BrilliantFarmer:
                     c.rank = idx + 1
                     c.is_best = (idx == 0)
                 return reordered
-            else:
+            elif gambit_ok:
                 new_c = CandidateMove(
                     move=g_move,
                     san=g_san,
@@ -97,16 +229,14 @@ class BrilliantFarmer:
                 return reordered
 
         processed: List[CandidateMove] = []
-        brilliant_cands: List[Tuple[CandidateMove, str]] = []
-
-        best_cand = candidates[0]
+        brilliant_cands: List[Tuple[CandidateMove, str, int]] = []
 
         for cand in candidates:
             is_brill, reason = self.evaluate_move_brilliance(board, cand, best_cand)
             if is_brill:
                 cand.is_brilliant = True
                 cand.brilliant_reason = reason
-                brilliant_cands.append((cand, reason))
+                brilliant_cands.append((cand, reason, self._farm_priority(board, cand, reason)))
             else:
                 cand.is_brilliant = False
                 cand.brilliant_reason = ""
@@ -114,24 +244,16 @@ class BrilliantFarmer:
 
         # If one or more brilliant moves are discovered, promote the best brilliant move to Rank 1
         if brilliant_cands:
-            # Sort brilliant candidates by eval (mate first, then score_cp)
-            brilliant_cands.sort(
-                key=lambda x: (
-                    10000 if (x[0].mate_in and x[0].mate_in > 0)
-                    else (-10000 if (x[0].mate_in and x[0].mate_in < 0)
-                    else (x[0].score_cp or 0))
-                ),
-                reverse=True
-            )
-            top_brilliant, _ = brilliant_cands[0]
+            brilliant_cands.sort(key=lambda x: (x[2], self._eval_cp(x[0])), reverse=True)
+            top_brilliant = brilliant_cands[0][0]
+            others_brill = [b[0] for b in brilliant_cands[1:]]
 
-            # Re-order: place top brilliant move at index 0 (Rank 1)
-            reordered = [top_brilliant]
+            # Re-order: top brilliant first, then other brilliants, then the remaining engine lines
+            reordered = [top_brilliant] + others_brill
             for c in processed:
-                if c.move != top_brilliant.move:
+                if c.move != top_brilliant.move and c not in others_brill:
                     reordered.append(c)
 
-            # Re-assign ranks 1, 2, 3
             for idx, c in enumerate(reordered[:3]):
                 c.rank = idx + 1
                 c.is_best = (idx == 0)
@@ -139,6 +261,22 @@ class BrilliantFarmer:
             return reordered
 
         return processed
+
+    def _farm_priority(self, board: chess.Board, cand: CandidateMove, reason: str) -> int:
+        """Ranking among several brilliant candidates (higher = farm it first)."""
+        pri = 0
+        if "Greek Gift" in reason:
+            pri += 60
+        if reason.startswith("Verified"):
+            pri += 40
+        for key, val in (("Queen", 35), ("Rook", 30), ("Exchange", 25), ("Stalemate", 20),
+                         ("Bishop", 18), ("Knight", 18), ("King", 22), ("Pawn", 8)):
+            if key in reason:
+                pri += val
+                break
+        if cand.mate_in is not None and cand.mate_in > 0:
+            pri += 30
+        return pri
 
     def evaluate_move_brilliance(
         self,
@@ -151,50 +289,78 @@ class BrilliantFarmer:
         Returns (is_brilliant, reason_string).
         """
         move = cand.move
-        turn = board.turn
-        opp = not turn
-
-        # 1. Competitive Context:
-        # Not already completely crushed (+12.00 cp / mate-in-1 against zero pieces)
-        if cand.score_cp is not None and cand.score_cp > 1200:
+        if move not in board.legal_moves:
             return False, ""
 
-        # 2. Favorable / Sound Outcome:
-        # Avoid blunders: do not sacrifice into an opponent forced mate
-        if cand.mate_in is not None and cand.mate_in < 0:
-            return False, ""
-
-        # Drop-off check:
-        # On Chess.com, a sacrifice does not need to be 0.00 delta.
-        # It is brilliant if it is best move, OR within 0.85 pawns of best move,
-        # OR still maintains a solid advantage (score_cp >= 75 cp or forced mate).
-        diff = cand.eval_diff if cand.eval_diff is not None else 0.0
         score = cand.score_cp if cand.score_cp is not None else 0
         mate = cand.mate_in
+        best_val = self._eval_cp(best_cand)
+        cand_val = self._eval_cp(cand)
+        diff = (cand_val - best_val) / 100.0
 
-        is_competitive_or_sound = (
-            cand.is_best
-            or diff >= -0.85
-            or score >= 75
-            or (mate is not None and mate > 0)
-        )
-        if not is_competitive_or_sound:
-            # Exception: Stalemate desperado trick from lost position
-            if not self._is_stalemate_desperado(board, move):
-                return False, ""
-
-        # Avoid sacrifices into dead lost positions (score < -150 cp) unless desperado
-        if score < -150 and mate is None:
-            if not self._is_stalemate_desperado(board, move):
-                return False, ""
-
-        # 3. Material Sacrifice Detection:
-        is_sac, sac_type, sac_desc = self._is_material_sacrifice(board, move)
-        if not is_sac:
+        # 1. Competitive Context: never inside a completely won / crushing position
+        if mate is None and score > 1200:
+            return False, ""
+        if best_cand.mate_in is None and best_cand.score_cp is not None and best_cand.score_cp > self.CRUSHING_CP:
             return False, ""
 
-        reason = f"{sac_type}: {sac_desc}"
-        return True, reason
+        # 2. Favorable / Sound Outcome: never sacrifice into a forced mate
+        if mate is not None and mate < 0:
+            return False, ""
+
+        losing_before = best_val <= -150
+        winning_before = best_val >= 150
+        tolerance = 0.30 if winning_before else (0.60 if best_val >= -50 else 0.90)
+        floor = (best_val - 50) if losing_before else -100
+
+        sound = (
+            cand is best_cand
+            or cand.is_best
+            or (mate is not None and mate > 0)
+            or (diff >= -tolerance and cand_val >= floor)
+        )
+
+        stalemate_trick = False
+        if losing_before or not sound:
+            if self._is_stalemate_desperado(board, move) and (mate is None) and score >= -60:
+                stalemate_trick = True
+        if not sound and not stalemate_trick:
+            return False, ""
+
+        # 3. Verify the sacrifice against the engine's principal variation when available
+        pv_delta = self.pv_material_delta(board, cand.pv) if cand.pv else None
+        is_sac, sac_type, sac_desc = self._is_material_sacrifice(board, move)
+
+        if stalemate_trick:
+            return True, "Verified Stalemate Trap: Sacrifices material so that capturing leads to stalemate and saves the game"
+
+        greek = self.is_greek_gift_setup(board, move)
+
+        if pv_delta is not None:
+            if pv_delta <= self.PV_SAC_STRONG:
+                label = sac_type if is_sac and not sac_type.startswith("Counter-Intuitive") else self._generic_sac_label(board, move)
+                desc = sac_desc if is_sac and not sac_type.startswith("Counter-Intuitive") else (
+                    f"Engine line gives up about {abs(pv_delta) / 100:.1f} pawns of material for a decisive initiative")
+                if greek:
+                    label, desc = "Greek Gift Sacrifice", "Bishop sacrifice on h7/h2 exposes the king; Ng5+ and Qh5 follow with a crushing attack"
+                return True, f"Verified {label}: {desc}"
+            if pv_delta <= self.PV_SAC_LIGHT and is_sac and not sac_type.startswith("Counter-Intuitive"):
+                return True, f"{sac_type}: {sac_desc}"
+            if greek and pv_delta <= 0:
+                return True, "Greek Gift Sacrifice: Bishop sacrifice on h7/h2 exposes the king; Ng5+ and Qh5 follow"
+            # PV shows material is regained: an exchange, not a sacrifice
+            return False, ""
+
+        # No usable PV: fall back to the static sacrifice heuristics
+        if not is_sac:
+            return False, ""
+        return True, f"{sac_type}: {sac_desc}"
+
+    def _generic_sac_label(self, board: chess.Board, move: chess.Move) -> str:
+        piece = board.piece_at(move.from_square)
+        if not piece:
+            return "Material Sacrifice"
+        return f"{self.PIECE_NAMES[piece.piece_type].capitalize()} Sacrifice"
 
     def is_move_sound_sacrifice(self, board: chess.Board, move: chess.Move) -> Tuple[bool, str]:
         """Direct check if a legal move is a recognized material sacrifice."""

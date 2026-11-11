@@ -379,3 +379,124 @@ class GambitsAndTraps:
             tactical_idea="Baits White into 4. Nxe5? where Black unleashes 4... Qg5! winning queen or checkmating",
             side=chess.BLACK
         )
+
+
+        # =========================================================================
+        # 4. EXTRA TRAPS FOR FARMING BRILLIANTS (Damiano, Elephant, St. George, Englund)
+        # =========================================================================
+
+        # Damiano Defense trap: 1. e4 e5 2. Nf3 f6?! -> 3. Nxe5!! fxe5 4. Qh5+ Ke7 5. Qxe5+ Kf7 6. Bc4+
+        self._add(
+            name="Damiano Defense Trap (Knight Sacrifice)",
+            fen_or_moves="e4 e5 Nf3 f6",
+            move_uci="f3e5",
+            move_san="Nxe5",
+            sacrifice_type="Knight Sacrifice",
+            tactical_idea="Sacrifices the knight on e5 to drag the black king into the open; Qh5+ wins by force",
+            side=chess.WHITE
+        )
+        self._add(
+            name="Damiano Defense Trap (Queen Check)",
+            fen_or_moves="e4 e5 Nf3 f6 Nxe5 fxe5",
+            move_uci="d1h5",
+            move_san="Qh5+",
+            sacrifice_type="Knight Sacrifice Follow-up",
+            tactical_idea="Qh5+ forks the king and e5 pawn, forcing Ke7 or g6 and recovering material with a raging attack",
+            side=chess.WHITE
+        )
+        self._add(
+            name="Damiano Defense Trap (Queen Takes)",
+            fen_or_moves="e4 e5 Nf3 f6 Nxe5 fxe5 Qh5+ Ke7",
+            move_uci="h5e5",
+            move_san="Qxe5+",
+            sacrifice_type="Knight Sacrifice Follow-up",
+            tactical_idea="Qxe5+ regains the piece with check, leaving the black king stranded in the center",
+            side=chess.WHITE
+        )
+        self._add(
+            name="Damiano Defense Trap (Bishop Check)",
+            fen_or_moves="e4 e5 Nf3 f6 Nxe5 fxe5 Qh5+ Ke7 Qxe5+ Kf7",
+            move_uci="f1c4",
+            move_san="Bc4+",
+            sacrifice_type="Knight Sacrifice Follow-up",
+            tactical_idea="Bc4+ keeps the king exposed: Kg6 / d5 Bxd5+ leads to a decisive attack",
+            side=chess.WHITE
+        )
+
+        # Elephant Trap (Queen's Gambit Declined): black sets the trap and then springs Bb4+!!
+        self._add(
+            name="Elephant Trap Setup",
+            fen_or_moves="d4 d5 c4 e6 Nc3 Nf6 Bg5",
+            move_uci="b8d7",
+            move_san="Nbd7",
+            sacrifice_type="Opening Trap",
+            tactical_idea="Develops the knight to d7 baiting White into the greedy cxd5 / Nxd5?? of the Elephant Trap",
+            side=chess.BLACK
+        )
+        self._add(
+            name="Elephant Trap (Bishop Check Queen Sacrifice)",
+            fen_or_moves="d4 d5 c4 e6 Nc3 Nf6 Bg5 Nbd7 cxd5 exd5 Nxd5 Nxd5 Bxd8",
+            move_uci="f8b4",
+            move_san="Bb4+",
+            sacrifice_type="Queen Sacrifice",
+            tactical_idea="Bb4+! lets White take the queen, but after Qd2 Bxd2+ Kxd2 Kxd8 Black is a full piece up",
+            side=chess.BLACK
+        )
+
+        # St. George Defense: 1. e4 a6 2. d4 b5 - offers a pawn for queenside space and tricks
+        self._add(
+            name="St. George Defense",
+            fen_or_moves="e4",
+            move_uci="a7a6",
+            move_san="a6",
+            sacrifice_type="Opening Trap",
+            tactical_idea="Prepares ...b5 and ...Bb7 with surprising tactics against greedy opponents",
+            side=chess.BLACK
+        )
+        self._add(
+            name="St. George Defense Pawn Offer",
+            fen_or_moves="e4 a6 d4",
+            move_uci="b7b5",
+            move_san="b5",
+            sacrifice_type="Pawn Sacrifice",
+            tactical_idea="Offers the b5 pawn: Bxb5 axb5 Qxb5+ allows ...Bd7 / ...Nc6 with a dangerous initiative",
+            side=chess.BLACK
+        )
+
+        # Englund Gambit Trap: 1. d4 e5 2. dxe5 Nc6 3. Nf3 Qe7 4. Bf4 Qb4+ 5. Bd2 Qxb2!!
+        self._add(
+            name="Englund Gambit Trap (Nc6)",
+            fen_or_moves="d4 e5 dxe5",
+            move_uci="b8c6",
+            move_san="Nc6",
+            sacrifice_type="Pawn Sacrifice Trap",
+            tactical_idea="Develops with tempo against e5, heading for the Englund queen trap",
+            side=chess.BLACK
+        )
+        self._add(
+            name="Englund Gambit Trap (Qe7)",
+            fen_or_moves="d4 e5 dxe5 Nc6 Nf3",
+            move_uci="d8e7",
+            move_san="Qe7",
+            sacrifice_type="Pawn Sacrifice Trap",
+            tactical_idea="Qe7 attacks e5 and sets the Englund trap against Bf4?",
+            side=chess.BLACK
+        )
+        self._add(
+            name="Englund Gambit Trap (Qb4+)",
+            fen_or_moves="d4 e5 dxe5 Nc6 Nf3 Qe7 Bf4",
+            move_uci="e7b4",
+            move_san="Qb4+",
+            sacrifice_type="Queen Raid Trap",
+            tactical_idea="Qb4+ forks the king and the bishop on f4; after Bd2 Qxb2 the queen runs wild",
+            side=chess.BLACK
+        )
+        self._add(
+            name="Englund Gambit Trap (Qxb2)",
+            fen_or_moves="d4 e5 dxe5 Nc6 Nf3 Qe7 Bf4 Qb4+ Bd2",
+            move_uci="b4b2",
+            move_san="Qxb2",
+            sacrifice_type="Queen Sacrifice Trap",
+            tactical_idea="Qxb2!! grabs the pawn with the queen en prise - Bc3 Bb4 and Black wins big material",
+            side=chess.BLACK
+        )

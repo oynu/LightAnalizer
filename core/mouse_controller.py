@@ -1,25 +1,22 @@
 """
 Mouse Controller for On-Screen Live Chess Clients.
-Translates chess moves into physical hardware screen clicks on the calibrated chessboard.
-Supports 1-button auto-move mode with DPR scaling, SendInput injection, and smooth gliding.
+Translates chess moves into physical hardware-level screen clicks on the calibrated chessboard.
+
+Each move is played exactly like a human would: glide to the piece, click it, short pause,
+glide to the target square, click it. Every mouse button event is injected exactly ONCE through
+Win32 `SendInput` (falling back to `mouse_event` only if SendInput is rejected), so a click can
+never be doubled/toggled.
 """
 from __future__ import annotations
 import time
 import math
+import random
 import threading
 from typing import Optional, Tuple, Callable
 import ctypes
 from ctypes import wintypes
 import chess
 from core.types import BoardCalibration
-
-# Optional PyAutoGUI integration for seamless cross-process input synthesis
-try:
-    import pyautogui
-    pyautogui.FAILSAFE = False
-    pyautogui.PAUSE = 0.02
-except Exception:
-    pyautogui = None
 
 # Win32 Constants
 INPUT_MOUSE = 0
@@ -29,7 +26,7 @@ MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_ABSOLUTE = 0x8000
 MOUSEEVENTF_VIRTUALDESK = 0x4000
 
-# Win32 Structures for 64-bit Windows SendInput
+
 class MOUSEINPUT(ctypes.Structure):
     _fields_ = [
         ("dx", wintypes.LONG),
@@ -40,6 +37,7 @@ class MOUSEINPUT(ctypes.Structure):
         ("dwExtraInfo", ctypes.c_void_p)
     ]
 
+
 class INPUT(ctypes.Structure):
     class _INPUT_UNION(ctypes.Union):
         _fields_ = [("mi", MOUSEINPUT)]
@@ -48,6 +46,7 @@ class INPUT(ctypes.Structure):
         ("type", wintypes.DWORD),
         ("_input", _INPUT_UNION)
     ]
+
 
 try:
     _user32 = ctypes.windll.user32
@@ -60,17 +59,17 @@ except Exception:
 class MouseMoveController:
     """
     Translates chess moves into physical on-screen mouse clicks using calibrated
-    chessboard coordinates. Uses multi-layer input injection (SendInput, mouse_event,
-    and PyAutoGUI) to guarantee the cursor moves visibly and clicks register across
-    all browsers and chess clients (Chess.com, Lichess, etc.).
+    chessboard coordinates (HUD-accurate, DPI aware, multi-monitor aware).
     """
 
     def __init__(self):
         self._lock = threading.Lock()
         self._is_executing = False
         self._auto_move_enabled = False
-        self._click_delay_ms = 110  # Natural human dwell between piece click and square click
-        self._humanize_glide = True  # Visibly glide cursor across screen
+        self._rng = random.Random()
+        self._humanize_glide = True
+        self._click_jitter = 0.16      # click anywhere within the central ~32% of a square
+        self.last_error: str = ""
 
     @property
     def auto_move_enabled(self) -> bool:
@@ -84,10 +83,18 @@ class MouseMoveController:
     def is_executing(self) -> bool:
         return self._is_executing
 
-    def get_square_coords(self, cal: BoardCalibration, square: chess.Square) -> Tuple[int, int]:
+    # ------------------------------------------------------------------
+    # Geometry
+    # ------------------------------------------------------------------
+    def get_square_coords(
+        self,
+        cal: BoardCalibration,
+        square: chess.Square,
+        jitter: float = 0.0
+    ) -> Tuple[int, int]:
         """
-        Calculates physical screen (x, y) coordinates for the center of a chess square,
-        properly scaled by the device pixel ratio (DPR) to match Screen HUD arrows exactly.
+        Physical screen (x, y) of a square center, matching the Screen HUD arrow geometry exactly.
+        `jitter` (fraction of a square) randomly offsets the point inside the square like a human click.
         """
         file_idx = chess.square_file(square)
         rank_idx = chess.square_rank(square)
@@ -104,18 +111,22 @@ class MouseMoveController:
         bx = cal.x + (cal.width - b_size) / 2.0
         by = cal.y + (cal.height - b_size) / 2.0
 
-        # Center of square in logical units
         log_x = bx + (col * sq_size) + (sq_size / 2.0)
         log_y = by + (row * sq_size) + (sq_size / 2.0)
+
+        if jitter > 0:
+            log_x += self._rng.uniform(-jitter, jitter) * sq_size
+            log_y += self._rng.uniform(-jitter, jitter) * sq_size
 
         dpr = getattr(cal, "device_pixel_ratio", 1.0)
         if not dpr or dpr <= 0:
             dpr = 1.0
 
-        phys_x = int(round(log_x * dpr))
-        phys_y = int(round(log_y * dpr))
-        return phys_x, phys_y
+        return int(round(log_x * dpr)), int(round(log_y * dpr))
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
     def execute_move_async(
         self,
         cal: BoardCalibration,
@@ -146,33 +157,34 @@ class MouseMoveController:
         on_complete: Optional[Callable[[bool], None]]
     ) -> None:
         success = False
+        self.last_error = ""
         try:
-            x1, y1 = self.get_square_coords(cal, move.from_square)
-            x2, y2 = self.get_square_coords(cal, move.to_square)
+            x1, y1 = self.get_square_coords(cal, move.from_square, jitter=self._click_jitter)
+            x2, y2 = self.get_square_coords(cal, move.to_square, jitter=self._click_jitter)
             print(f"[MouseMoveController] Executing {move.uci()}: ({x1}, {y1}) -> ({x2}, {y2})")
 
-            # 1. Visibly glide cursor to source piece and click it
-            self._move_cursor(x1, y1, smooth=True)
-            time.sleep(0.04)
-            self._click_at(x1, y1)
+            # 1. Glide to the piece and click it
+            self._glide_to(x1, y1, self._rng.uniform(0.16, 0.38))
+            time.sleep(self._rng.uniform(0.05, 0.12))
+            self._click()
 
-            # 2. Natural human dwell delay between selecting piece and choosing destination
-            dwell = max(0.12, self._click_delay_ms / 1000.0)
-            time.sleep(dwell)
+            # 2. Human pause between selecting the piece and choosing the destination
+            time.sleep(self._rng.uniform(0.12, 0.34))
 
-            # 3. Visibly glide cursor to destination square and click it
-            self._move_cursor(x2, y2, smooth=True)
-            time.sleep(0.04)
-            self._click_at(x2, y2)
+            # 3. Glide to destination and click it
+            self._glide_to(x2, y2, self._rng.uniform(0.16, 0.40))
+            time.sleep(self._rng.uniform(0.05, 0.12))
+            self._click()
 
-            # 4. Handle pawn promotion if applicable (default promote to Queen)
+            # 4. Pawn promotion: auto-queen popup normally sits on the destination square
             if move.promotion:
-                time.sleep(0.10)
-                self._click_at(x2, y2)
+                time.sleep(self._rng.uniform(0.25, 0.45))
+                self._click()
 
             success = True
-            print(f"[MouseMoveController] Move {move.uci()} successfully clicked on screen.")
+            print(f"[MouseMoveController] Move {move.uci()} clicked on screen.")
         except Exception as e:
+            self.last_error = str(e)
             print(f"[MouseMoveController] Execution error: {e}")
         finally:
             with self._lock:
@@ -183,8 +195,11 @@ class MouseMoveController:
                 except Exception as ex:
                     print(f"[MouseMoveController] on_complete callback error: {ex}")
 
+    # ------------------------------------------------------------------
+    # Win32 injection primitives
+    # ------------------------------------------------------------------
     def _to_normalized_coords(self, x: int, y: int) -> Tuple[int, int]:
-        """Maps physical pixel coordinates to normalized 0..65535 Windows desktop space."""
+        """Maps physical pixel coordinates to normalized 0..65535 virtual-desktop space."""
         try:
             u32 = ctypes.windll.user32
             vx = u32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
@@ -202,113 +217,86 @@ class MouseMoveController:
         except Exception:
             return 0, 0
 
+    def _inject(self, flags: int, dx: int = 0, dy: int = 0) -> bool:
+        """Injects ONE mouse event. SendInput first, legacy mouse_event only if SendInput was rejected."""
+        if _user32 is not None:
+            try:
+                inp = INPUT()
+                inp.type = INPUT_MOUSE
+                inp.mi.dx = dx
+                inp.mi.dy = dy
+                inp.mi.mouseData = 0
+                inp.mi.dwFlags = flags
+                inp.mi.time = 0
+                inp.mi.dwExtraInfo = None
+                if _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT)) == 1:
+                    return True
+            except Exception:
+                pass
+        try:
+            ctypes.windll.user32.mouse_event(flags, dx, dy, 0, 0)
+            return True
+        except Exception:
+            return False
+
     def _set_cursor_position(self, x: int, y: int) -> None:
-        """Sets cursor position via SetCursorPos, SendInput, and mouse_event."""
+        """Teleports the cursor: SetCursorPos plus an absolute SendInput move so apps receive WM_MOUSEMOVE."""
+        x, y = int(x), int(y)
         try:
-            ctypes.windll.user32.SetCursorPos(int(x), int(y))
+            ctypes.windll.user32.SetCursorPos(x, y)
         except Exception:
             pass
+        nx, ny = self._to_normalized_coords(x, y)
+        self._inject(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK, nx, ny)
 
-        norm_x, norm_y = self._to_normalized_coords(x, y)
-        flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-
-        # SendInput driver-level injection
-        if _user32:
-            try:
-                inp = INPUT()
-                inp.type = INPUT_MOUSE
-                inp.mi.dx = norm_x
-                inp.mi.dy = norm_y
-                inp.mi.dwFlags = flags
-                inp.mi.mouseData = 0
-                inp.mi.time = 0
-                inp.mi.dwExtraInfo = None
-                _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT))
-            except Exception:
-                pass
-
-        # mouse_event OS queue injection
+    def _get_cursor_position(self) -> Optional[Tuple[int, int]]:
         try:
-            ctypes.windll.user32.mouse_event(flags, norm_x, norm_y, 0, 0)
+            pt = wintypes.POINT()
+            if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
+                return pt.x, pt.y
         except Exception:
             pass
+        return None
 
-    def _move_cursor(self, target_x: int, target_y: int, smooth: bool = True) -> None:
-        """Moves cursor to target coordinates, optionally with a smooth visible glide."""
-        if smooth and self._humanize_glide:
-            # Try PyAutoGUI smooth glide first
-            if pyautogui:
-                try:
-                    pyautogui.moveTo(target_x, target_y, duration=0.14, tween=pyautogui.easeInOutQuad)
-                    self._set_cursor_position(target_x, target_y)
-                    return
-                except Exception:
-                    pass
+    def _glide_to(self, tx: int, ty: int, duration: float) -> None:
+        """Moves the cursor along a slightly curved, eased path so the motion is visible and natural."""
+        start = self._get_cursor_position()
+        if not self._humanize_glide or start is None:
+            self._set_cursor_position(tx, ty)
+            return
 
-            # Fallback smooth interpolation
+        sx, sy = start
+        dist = math.hypot(tx - sx, ty - sy)
+        if dist < 3:
+            self._set_cursor_position(tx, ty)
+            return
+
+        steps = max(10, min(60, int(duration / 0.008)))
+        # Quadratic Bezier control point offset perpendicular to the path
+        nx, ny = -(ty - sy) / dist, (tx - sx) / dist
+        bend = self._rng.uniform(-0.10, 0.10) * dist
+        cx = (sx + tx) / 2.0 + nx * bend
+        cy = (sy + ty) / 2.0 + ny * bend
+
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            e = t * t * (3.0 - 2.0 * t)
+            px = (1 - e) ** 2 * sx + 2 * (1 - e) * e * cx + e ** 2 * tx
+            py = (1 - e) ** 2 * sy + 2 * (1 - e) * e * cy + e ** 2 * ty
+            self._set_cursor_position(int(round(px)), int(round(py)))
+            time.sleep(duration / steps)
+
+        self._set_cursor_position(tx, ty)
+        pos = self._get_cursor_position()
+        if pos is not None and (abs(pos[0] - tx) > 3 or abs(pos[1] - ty) > 3):
             try:
-                pt = wintypes.POINT()
-                if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
-                    start_x, start_y = pt.x, pt.y
-                else:
-                    start_x, start_y = target_x, target_y
-
-                dist = math.hypot(target_x - start_x, target_y - start_y)
-                steps = min(15, max(4, int(dist / 35.0)))
-                for i in range(1, steps + 1):
-                    t = i / float(steps)
-                    ease_t = t * t * (3.0 - 2.0 * t)
-                    curr_x = int(start_x + (target_x - start_x) * ease_t)
-                    curr_y = int(start_y + (target_y - start_y) * ease_t)
-                    self._set_cursor_position(curr_x, curr_y)
-                    time.sleep(0.008)
+                ctypes.windll.user32.SetCursorPos(int(tx), int(ty))
             except Exception:
                 pass
 
-        self._set_cursor_position(target_x, target_y)
-
-    def _send_mouse_button(self, down: bool, x: int, y: int) -> None:
-        """Sends physical mouse down or mouse up event through all Win32 layers."""
-        norm_x, norm_y = self._to_normalized_coords(x, y)
-        btn_flag = MOUSEEVENTF_LEFTDOWN if down else MOUSEEVENTF_LEFTUP
-        flags = btn_flag | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-
-        # 1. SendInput
-        if _user32:
-            try:
-                inp = INPUT()
-                inp.type = INPUT_MOUSE
-                inp.mi.dx = norm_x
-                inp.mi.dy = norm_y
-                inp.mi.dwFlags = flags
-                inp.mi.mouseData = 0
-                inp.mi.time = 0
-                inp.mi.dwExtraInfo = None
-                _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT))
-            except Exception:
-                pass
-
-        # 2. mouse_event
-        try:
-            ctypes.windll.user32.mouse_event(flags, norm_x, norm_y, 0, 0)
-        except Exception:
-            pass
-
-        # 3. PyAutoGUI
-        if pyautogui:
-            try:
-                if down:
-                    pyautogui.mouseDown(x=x, y=y, button="left")
-                else:
-                    pyautogui.mouseUp(x=x, y=y, button="left")
-            except Exception:
-                pass
-
-    def _click_at(self, x: int, y: int) -> None:
-        """Performs a physical click at (x, y) with proper press down, dwell, and release."""
-        self._set_cursor_position(x, y)
-        time.sleep(0.04)
-        self._send_mouse_button(down=True, x=x, y=y)
-        time.sleep(0.055)  # 55ms realistic press dwell
-        self._send_mouse_button(down=False, x=x, y=y)
-        time.sleep(0.04)
+    def _click(self) -> None:
+        """One physical left click at the current cursor position (single down + single up)."""
+        self._inject(MOUSEEVENTF_LEFTDOWN)
+        time.sleep(self._rng.uniform(0.045, 0.095))
+        self._inject(MOUSEEVENTF_LEFTUP)
+        time.sleep(0.03)

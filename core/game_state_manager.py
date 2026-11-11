@@ -112,9 +112,14 @@ class GameStateManager(QObject):
 
     def set_brilliant_mode(self, enabled: bool) -> None:
         self._brilliant_mode = enabled
-        # Boost MultiPV search depth to 6 when farming brilliance to unearth tactical sacrifices
+        # Widen MultiPV to 8 when farming brilliance and let the engine PROBE sacrifice-shaped moves
+        # (Greek Gift, rook/queen sacrifices, stalemate tricks...) that fall outside the top lines
         if hasattr(self.engine_mgr, "config"):
-            self.engine_mgr.config.multipv = 6 if enabled else 3
+            self.engine_mgr.config.multipv = 8 if enabled else 3
+        try:
+            self.engine_mgr.probe_moves_provider = self.brilliant_farmer.probe_moves if enabled else None
+        except Exception:
+            pass
 
         # Re-request active position analysis with 6 lines
         self._position_version += 1
@@ -167,6 +172,17 @@ class GameStateManager(QObject):
         return self._latest_candidates
 
     @property
+    def analysis_settled(self) -> bool:
+        """True once the engine finished its full search (incl. sacrifice probes) for the active position."""
+        final_fen = getattr(self.engine_mgr, "last_final_fen", None)
+        return bool(self._latest_candidates) and final_fen is not None and final_fen == self.board_state.board.fen()
+
+    @property
+    def is_following_live_game(self) -> bool:
+        """True when the board shown/analysed is the authoritative live position (not a variation / history step)."""
+        return (not self._is_exploring_variation) and self.board_state.board.fen() == self._live_board.fen()
+
+    @property
     def summary(self) -> Optional[PositionSummary]:
         return self._latest_summary
 
@@ -213,16 +229,18 @@ class GameStateManager(QObject):
         except Exception:
             move_san = move.uci()
 
-        # Check if the confirmed move was a brilliant move
+        # Check if the confirmed move was a brilliant move (only the player's own moves count)
         was_brilliant = False
-        for c in self._latest_candidates:
-            if getattr(c, "is_brilliant", False) and c.move == move:
-                was_brilliant = True
-                break
-        if not was_brilliant:
-            is_sound, _ = self.brilliant_farmer.is_move_sound_sacrifice(self.board_state.board, move)
-            if is_sound:
-                was_brilliant = True
+        mover_color = self.board_state.board.turn
+        if mover_color == self.player_color:
+            for c in self._latest_candidates:
+                if getattr(c, "is_brilliant", False) and c.move == move:
+                    was_brilliant = True
+                    break
+            if not was_brilliant:
+                is_sound, _ = self.brilliant_farmer.is_move_sound_sacrifice(self.board_state.board, move)
+                if is_sound:
+                    was_brilliant = True
 
         if was_brilliant:
             self._brilliant_count += 1

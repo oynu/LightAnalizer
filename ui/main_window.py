@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QStackedWidget, QDialog
 )
 from PySide6.QtGui import QKeySequence, QShortcut, QAction
-from PySide6.QtCore import Qt, Slot, QTimer
+from PySide6.QtCore import Qt, Slot, QTimer, Signal
 from core.types import OperatingMode, SyncStatus, BoardCalibration, DiagnosticsData
 from core.game_state_manager import GameStateManager
 from core.modes import ModeManager
@@ -23,6 +23,7 @@ from core.vision.moves_tab_observer import MovesTabObserver
 from core.vision.screen_overlay import BoardSelectionOverlay
 from core.review import GameReviewer
 from core.mouse_controller import MouseMoveController
+from core.auto_player import AutoMovePlanner
 
 from ui.styles import DARK_THEME_QSS
 from ui.views.analysis_view import AnalysisView
@@ -37,6 +38,8 @@ class MainWindow(QMainWindow):
     """
     Focused desktop shell designed around live board synchronization and candidate moves.
     """
+    _mouse_move_done = Signal(bool)
+
     def __init__(
         self,
         game_state_mgr: GameStateManager,
@@ -68,6 +71,21 @@ class MainWindow(QMainWindow):
         self.mouse_controller = MouseMoveController()
         self._activate_overlay_after_calibration = False
         self._activate_auto_move_after_calibration = False
+        self._click_calibration: Optional[BoardCalibration] = None
+        self._pending_click_board = None
+
+        # Fully automatic move playing (human-like think time + physical mouse clicks)
+        self._auto_planner = AutoMovePlanner()
+        self._auto_plan = None
+        self._auto_attempts = {}
+        self._auto_last_pick = {}
+        self._auto_last_click_fen = None
+        self._auto_fire_timer = QTimer(self)
+        self._auto_fire_timer.setSingleShot(True)
+        self._auto_fire_timer.timeout.connect(self._auto_fire)
+        self._auto_tick_timer = QTimer(self)
+        self._auto_tick_timer.timeout.connect(self._apply_auto_status)
+        self._mouse_move_done.connect(self._on_mouse_move_done)
 
         self._setup_ui()
         self._setup_shortcuts()
@@ -465,6 +483,7 @@ class MainWindow(QMainWindow):
 
     def _on_calibration_confirmed(self, cal: BoardCalibration) -> None:
         self._active_overlay = None
+        self._click_calibration = None
         # Clean start on every board selection: wipe previous match state and caches
         self.game_state_mgr.reset_for_new_game()
         if self.moves_tab_observer and self.moves_tab_observer.is_active():
@@ -492,7 +511,7 @@ class MainWindow(QMainWindow):
             self.mouse_controller.auto_move_enabled = True
             self.view_analysis.set_auto_move_active(True)
             self.sync_pill.setText("🖱 Auto-Move ON")
-            QTimer.singleShot(400, lambda: self._try_auto_click_turn(force=True))
+            QTimer.singleShot(400, self._try_auto_click_turn)
 
         # Switch to main analysis view immediately
         self.switch_view(0)
@@ -876,28 +895,113 @@ class MainWindow(QMainWindow):
 
         self._sync_screen_overlay()
         self._try_auto_click_turn()
+        self._apply_auto_status()
 
+    # ------------------------------------------------------------------
+    # Board geometry used for on-screen clicks / HUD
+    # ------------------------------------------------------------------
     def _get_active_calibration(self) -> Optional[BoardCalibration]:
-        """Returns the active calibrated board coordinates from vision observer or HUD overlay."""
+        """
+        Returns the calibrated on-screen chessboard rectangle: the vision observer's board, else the
+        board picked specifically for clicks (works in Moves-Tab mode), else the HUD overlay board.
+        """
         cal = getattr(self.observer, "calibration", None)
         if cal and cal.is_calibrated:
             return cal
+        click_cal = getattr(self, "_click_calibration", None)
+        if click_cal and click_cal.is_calibrated:
+            return click_cal
         if hasattr(self, "screen_overlay") and self.screen_overlay:
             cal_overlay = getattr(self.screen_overlay, "_calibration", None)
             if cal_overlay and cal_overlay.is_calibrated:
                 return cal_overlay
         return None
 
+    def _request_board_for_screen_features(self, auto_move: bool = False, hud: bool = False) -> None:
+        """
+        Asks the user to select the on-screen chessboard. In Moves-Tab mode a NON-destructive
+        selector is used so the running move tracking / game state is never reset.
+        """
+        if self.moves_tab_observer and self.moves_tab_observer.is_active():
+            self.open_click_board_selector(auto_move=auto_move, hud=hud)
+        else:
+            if auto_move:
+                self._activate_auto_move_after_calibration = True
+            if hud:
+                self._activate_overlay_after_calibration = True
+            self.open_board_selector()
+
+    def open_click_board_selector(self, auto_move: bool = False, hud: bool = False) -> None:
+        if self._active_overlay is not None:
+            try:
+                self._active_overlay.close()
+            except Exception:
+                pass
+            self._active_overlay = None
+        self._pending_click_board = {"auto_move": auto_move, "hud": hud}
+        detector = getattr(self.observer, "detector", None)
+        self._active_overlay = BoardSelectionOverlay(detector=detector, mode="board")
+        self._active_overlay.calibration_confirmed.connect(self._on_click_board_confirmed)
+        self._active_overlay.cancelled.connect(self._on_click_board_cancelled)
+        self._active_overlay.show()
+
+    def _on_click_board_cancelled(self) -> None:
+        self._pending_click_board = None
+        if getattr(self.mouse_controller, "auto_move_enabled", False) and self._get_active_calibration() is None:
+            self.mouse_controller.auto_move_enabled = False
+            self.view_analysis.set_auto_move_active(False)
+        self._on_overlay_cancelled()
+
+    def _on_click_board_confirmed(self, cal: BoardCalibration) -> None:
+        self._active_overlay = None
+        self._click_calibration = cal
+        pending = getattr(self, "_pending_click_board", None) or {}
+        self._pending_click_board = None
+        self.game_state_mgr.set_orientation(cal.orientation_white_bottom)
+
+        if pending.get("hud") or (hasattr(self, "screen_overlay") and self.screen_overlay.isVisible()):
+            self.screen_overlay.update_calibration(cal)
+            self.screen_overlay.set_white_at_bottom(cal.orientation_white_bottom)
+            self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+            self.screen_overlay.show()
+            self.view_analysis.set_screen_hud_active(True)
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        if self._always_on_top:
+            self._apply_win32_topmost(True)
+
+        if pending.get("auto_move"):
+            self.mouse_controller.auto_move_enabled = True
+            self.view_analysis.set_auto_move_active(True)
+            self.sync_pill.setText("🖱 Auto-Move ON")
+            self._try_auto_click_turn()
+
+    def _main_window_covers_board(self, cal: BoardCalibration) -> bool:
+        """True if this app's window sits on top of the board (clicks would hit our own UI)."""
+        try:
+            if not self.isVisible() or self.isMinimized():
+                return False
+            g = self.frameGeometry()
+            from PySide6.QtCore import QRect
+            board = QRect(int(cal.x), int(cal.y), int(cal.width), int(cal.height))
+            return g.intersects(board)
+        except Exception:
+            return False
+
+    # ------------------------------------------------------------------
+    # Manual one-shot move (Space)
+    # ------------------------------------------------------------------
     def play_best_move_on_screen(self) -> bool:
-        """Executes the top engine/brilliant move on the client chessboard via physical mouse clicks."""
+        """Immediately plays the top engine/brilliant move on the client board via physical mouse clicks."""
         if getattr(self, "mouse_controller", None) and self.mouse_controller.is_executing:
             return False
 
         cal = self._get_active_calibration()
         if not cal or not cal.is_calibrated:
-            self.sync_pill.setText("⚠️ Select chessboard first to move")
-            self._activate_auto_move_after_calibration = True
-            self.open_board_selector()
+            self.sync_pill.setText("⚠️ Select the chessboard first")
+            self._request_board_for_screen_features(auto_move=False)
             return False
 
         cands = self.game_state_mgr.candidates
@@ -905,66 +1009,167 @@ class MainWindow(QMainWindow):
             self.sync_pill.setText("⏳ Waiting for engine...")
             return False
 
+        if self._main_window_covers_board(cal):
+            self.sync_pill.setText("⚠️ Move LightAnalizer away from the board")
+            return False
+
+        self._auto_cancel()
         best_cand = cands[0]
-        board = self.game_state_mgr.current_board
-        current_ply = board.ply()
-        self._last_auto_played_ply = current_ply
+        return self._click_move_on_screen(cal, best_cand.move, best_cand.san, self.game_state_mgr.board_state.board.fen())
 
-        self.sync_pill.setText(f"🖱 Clicking: {best_cand.san}...")
-
-        def on_complete(success: bool):
-            if success:
-                self._on_screen_move_completed(True)
-            else:
-                self.sync_pill.setText(f"⚠️ Move click failed for {best_cand.san}")
-                # Reset ply tracker on failure so it can retry
-                self._last_auto_played_ply = -1
-
-        return self.mouse_controller.execute_move_async(
-            cal,
-            best_cand.move,
-            on_complete=on_complete
+    def _click_move_on_screen(self, cal: BoardCalibration, move: chess.Move, san: str, fen: str) -> bool:
+        self._auto_attempts[fen] = self._auto_attempts.get(fen, 0) + 1
+        self._auto_last_click_fen = fen
+        self.sync_pill.setText(f"🖱 Clicking: {san}...")
+        # on_complete runs on the mouse worker thread -> hop back to the GUI thread via a Qt signal
+        started = self.mouse_controller.execute_move_async(
+            cal, move, on_complete=lambda ok: self._mouse_move_done.emit(bool(ok))
         )
+        if not started:
+            self.sync_pill.setText("⚠️ Mouse busy / board not calibrated")
+        return started
 
-    def _on_screen_move_completed(self, success: bool) -> None:
+    @Slot(bool)
+    def _on_mouse_move_done(self, success: bool) -> None:
+        fen = getattr(self, "_auto_last_click_fen", None)
         if success:
             self.sync_pill.setText("✓ Move played on screen")
             QTimer.singleShot(1500, self._on_game_state_changed)
+        else:
+            self.sync_pill.setText("⚠️ Mouse click failed")
+        if self.mouse_controller.auto_move_enabled and fen:
+            # If the screen position did not change shortly after, retry (missed click / lag)
+            QTimer.singleShot(4500 if success else 1500, self, lambda f=fen: self._auto_verify_played(f))
 
+    def _on_screen_move_completed(self, success: bool) -> None:
+        self._on_mouse_move_done(success)
+
+    # ------------------------------------------------------------------
+    # Fully automatic mode
+    # ------------------------------------------------------------------
     def _on_auto_move_toggled(self, active: bool) -> None:
         self.mouse_controller.auto_move_enabled = active
+        self._auto_cancel()
+        self._auto_attempts.clear()
+        self._auto_last_pick.clear()
         if active:
             cal = self._get_active_calibration()
             if not cal or not cal.is_calibrated:
-                self.sync_pill.setText("⚠️ Select chessboard first to auto-move")
-                self._activate_auto_move_after_calibration = True
-                self.open_board_selector()
+                self.sync_pill.setText("⚠️ Select the chessboard first")
+                self._request_board_for_screen_features(auto_move=True)
                 return
-
             self.sync_pill.setText("🖱 Auto-Move ON")
-            self._try_auto_click_turn(force=True)
+            self._try_auto_click_turn()
         else:
             self.sync_pill.setText("🖱 Auto-Move OFF")
 
+    def _auto_cancel(self) -> None:
+        self._auto_fire_timer.stop()
+        self._auto_tick_timer.stop()
+        self._auto_plan = None
+
     def _try_auto_click_turn(self, force: bool = False) -> None:
-        if not getattr(self, "mouse_controller", None) or not self.mouse_controller.auto_move_enabled:
+        """
+        Called on every game-state change. When it is the player's turn, the engine search is final and
+        the board is calibrated, picks best / 2nd / 3rd move and schedules the human-like think delay.
+        """
+        mc = getattr(self, "mouse_controller", None)
+        if mc is None or not mc.auto_move_enabled:
             return
-        if self.mouse_controller.is_executing:
+        if mc.is_executing:
+            return
+
+        gsm = self.game_state_mgr
+        board = gsm.board_state.board
+        if board.is_game_over() or not gsm.is_following_live_game:
+            self._auto_cancel()
+            return
+        if board.turn != gsm.player_color:
+            self._auto_cancel()
+            self._auto_attempts.clear()
+            self._auto_last_pick.clear()
+            return
+
+        fen = board.fen()
+        if self._auto_plan is not None:
+            if self._auto_plan["fen"] == fen:
+                return
+            self._auto_cancel()
+
+        if not gsm.candidates or (not gsm.analysis_settled and not force):
             return
         cal = self._get_active_calibration()
         if not cal or not cal.is_calibrated:
+            self.sync_pill.setText("⚠️ Select the chessboard first")
             return
-        cands = self.game_state_mgr.candidates
-        if not cands:
+        attempts = self._auto_attempts.get(fen, 0)
+        if attempts >= 3:
             return
-        board = self.game_state_mgr.current_board
-        player_color = getattr(self.game_state_mgr, "player_color", chess.WHITE)
-        current_ply = board.ply()
 
-        # If forced or player turn:
-        if force or board.turn == player_color:
-            if getattr(self, "_last_auto_played_ply", -1) != current_ply or force:
-                self.play_best_move_on_screen()
+        if attempts > 0 and fen in self._auto_last_pick:
+            pick = self._auto_last_pick[fen]   # missed click: repeat the SAME move
+        else:
+            pick = self._auto_planner.choose_move(board, gsm.candidates, gsm.brilliant_mode)
+        if pick is None:
+            return
+        self._auto_last_pick[fen] = pick
+        cand, label = pick
+        delay, why = self._auto_planner.think_delay(board, cand, gsm.candidates, gsm.last_confirmed_move)
+        if attempts > 0:  # retry after a missed click: be quick
+            delay, why = min(delay, 1.2), "retrying click"
+
+        self._auto_plan = {
+            "fen": fen, "move": cand.move, "san": cand.san, "label": label, "why": why,
+            "fire_at": time.time() + delay, "brilliant": bool(cand.is_brilliant),
+        }
+        self._auto_fire_timer.start(int(delay * 1000))
+        self._auto_tick_timer.start(1000)
+        self._apply_auto_status()
+
+    def _apply_auto_status(self) -> None:
+        plan = self._auto_plan
+        if not plan:
+            return
+        remaining = max(0, int(round(plan["fire_at"] - time.time())))
+        tag = "💎 " if plan["brilliant"] else ""
+        self.sync_pill.setText(f"🖱 {tag}{plan['san']} ({plan['label']}) in {remaining}s · {plan['why']}")
+
+    def _auto_fire(self) -> None:
+        plan = self._auto_plan
+        self._auto_tick_timer.stop()
+        if not plan or not self.mouse_controller.auto_move_enabled:
+            self._auto_plan = None
+            return
+
+        gsm = self.game_state_mgr
+        board = gsm.board_state.board
+        # Position changed while "thinking" (opponent premove / resync / navigation): drop the plan
+        if board.fen() != plan["fen"] or not gsm.is_following_live_game or plan["move"] not in board.legal_moves:
+            self._auto_plan = None
+            QTimer.singleShot(200, self._try_auto_click_turn)
+            return
+
+        cal = self._get_active_calibration()
+        if not cal or not cal.is_calibrated:
+            self._auto_plan = None
+            return
+        if self._main_window_covers_board(cal):
+            self.sync_pill.setText("⚠️ Move LightAnalizer away from the board")
+            plan["fire_at"] = time.time() + 2.0
+            self._auto_fire_timer.start(2000)
+            return
+
+        self._auto_plan = None
+        self._click_move_on_screen(cal, plan["move"], plan["san"], plan["fen"])
+
+    def _auto_verify_played(self, fen: str) -> None:
+        """After clicking, if the very same position is still on the board on our turn, try again."""
+        if not self.mouse_controller.auto_move_enabled:
+            return
+        board = self.game_state_mgr.board_state.board
+        if board.fen() == fen and board.turn == self.game_state_mgr.player_color:
+            self._auto_cancel()
+            self._try_auto_click_turn(force=True)
 
     def _sync_screen_overlay(self) -> None:
         """Propagates latest moves and board perspective to the on-screen live overlay."""
@@ -987,8 +1192,7 @@ class MainWindow(QMainWindow):
         else:
             cal = self._get_active_calibration()
             if not cal or not cal.is_calibrated:
-                self._activate_overlay_after_calibration = True
-                self.open_board_selector()
+                self._request_board_for_screen_features(hud=True)
                 return
 
             orient = getattr(self.game_state_mgr, "orientation_white_bottom", True)
@@ -1002,6 +1206,8 @@ class MainWindow(QMainWindow):
             self.view_analysis.set_screen_hud_active(True)
 
     def _refresh_sync_pill_time(self) -> None:
+        if getattr(self, "_auto_plan", None) is not None or self.mouse_controller.is_executing:
+            return  # keep the auto-move countdown / click status visible
         if self.game_state_mgr.sync_status == SyncStatus.SYNCHRONIZED:
             time_diff = int(time.time() - self.game_state_mgr.last_sync_time)
             time_txt = f"{time_diff}s ago" if time_diff > 0 else "just now"
