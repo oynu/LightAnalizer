@@ -753,7 +753,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("B"), self, self.open_board_selector)
         QShortcut(QKeySequence("O"), self, self.toggle_screen_overlay)
         QShortcut(QKeySequence("Alt+B"), self, self.view_analysis._on_toggle_brilliant_mode)
-        QShortcut(QKeySequence("Alt+M"), self, self.view_analysis._on_toggle_auto_click)
+        QShortcut(QKeySequence("Alt+M"), self, self.view_analysis._on_toggle_auto_move)
         QShortcut(QKeySequence(Qt.Key_Space), self, self.play_best_move_on_screen)
         QShortcut(QKeySequence("D"), self, self._toggle_diagnostics)
         QShortcut(QKeySequence("F9"), self, self._on_flag_wrong_move)
@@ -795,7 +795,7 @@ class MainWindow(QMainWindow):
         self.game_state_mgr.add_diagnostics_listener(self.diagnostics_panel.update_diagnostics)
         self.view_analysis.screen_hud_requested.connect(self.toggle_screen_overlay)
         self.view_analysis.play_move_requested.connect(self.play_best_move_on_screen)
-        self.view_analysis.auto_click_toggled.connect(self._on_auto_click_toggled)
+        self.view_analysis.auto_move_toggled.connect(self._on_auto_move_toggled)
         self._on_game_state_changed()
 
     def _on_orientation_changed(self, white_bottom: bool) -> None:
@@ -890,14 +890,14 @@ class MainWindow(QMainWindow):
             self.sync_pill.setText("✓ Move played on screen")
             QTimer.singleShot(1500, self._on_game_state_changed)
 
-    def _on_auto_click_toggled(self, active: bool) -> None:
-        self.mouse_controller.auto_click_enabled = active
+    def _on_auto_move_toggled(self, active: bool) -> None:
+        self.mouse_controller.auto_move_enabled = active
         if active:
-            self.sync_pill.setText("🖱 Auto-Click ON")
+            self.sync_pill.setText("🖱 Auto-Move ON")
             self._try_auto_click_turn()
 
     def _try_auto_click_turn(self) -> None:
-        if not getattr(self, "mouse_controller", None) or not self.mouse_controller.auto_click_enabled:
+        if not getattr(self, "mouse_controller", None) or not self.mouse_controller.auto_move_enabled:
             return
         if self.mouse_controller.is_executing:
             return
@@ -909,8 +909,11 @@ class MainWindow(QMainWindow):
             return
         board = self.game_state_mgr.current_board
         player_color = getattr(self.game_state_mgr, "player_color", chess.WHITE)
+        current_ply = board.ply()
         if board.turn == player_color:
-            QTimer.singleShot(400, self.play_best_move_on_screen)
+            if getattr(self, "_last_auto_played_ply", -1) != current_ply:
+                self._last_auto_played_ply = current_ply
+                QTimer.singleShot(350, self.play_best_move_on_screen)
 
     def _sync_screen_overlay(self) -> None:
         """Propagates latest moves and board perspective to the on-screen live overlay."""

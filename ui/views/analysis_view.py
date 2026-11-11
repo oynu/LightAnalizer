@@ -23,8 +23,8 @@ class AnalysisView(QWidget):
     Focused live analysis workspace with high-visibility board and clear candidate move recommendations.
     """
     screen_hud_requested = Signal()
+    auto_move_toggled = Signal(bool)
     play_move_requested = Signal()
-    auto_click_toggled = Signal(bool)
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class AnalysisView(QWidget):
         self.mode_mgr = mode_mgr
         self._screen_hud_active = False
         self._brilliant_mode_active = False
-        self._auto_click_active = False
+        self._auto_move_active = False
 
         self._setup_ui()
         self._connect_signals()
@@ -169,17 +169,11 @@ class AnalysisView(QWidget):
         """)
         ctrl_row.addWidget(self.lbl_brilliant_counter)
 
-        self.btn_play_move = QPushButton("▶ Move (Space)")
-        self.btn_play_move.setToolTip("Click piece and move it directly on your screen client (Space)")
-        self.btn_play_move.setStyleSheet(btn_style)
-        self.btn_play_move.clicked.connect(self._on_play_move_clicked)
-        ctrl_row.addWidget(self.btn_play_move)
-
-        self.btn_auto_click = QPushButton("🖱 Auto: OFF")
-        self.btn_auto_click.setToolTip("Toggle automatic mouse clicks on your turn (Alt+M)")
-        self.btn_auto_click.setStyleSheet(btn_style)
-        self.btn_auto_click.clicked.connect(self._on_toggle_auto_click)
-        ctrl_row.addWidget(self.btn_auto_click)
+        self.btn_auto_move = QPushButton("🖱 Auto Move: OFF")
+        self.btn_auto_move.setToolTip("Click piece and destination square directly on your screen client (Space / Alt+M)")
+        self.btn_auto_move.setStyleSheet(btn_style)
+        self.btn_auto_move.clicked.connect(self._on_toggle_auto_move)
+        ctrl_row.addWidget(self.btn_auto_move)
 
         ctrl_row.addStretch()
         board_layout.addWidget(self.ctrl_row_widget)
@@ -421,19 +415,16 @@ class AnalysisView(QWidget):
                 }
             """)
 
-    def _on_play_move_clicked(self) -> None:
-        self.play_move_requested.emit()
+    def _on_toggle_auto_move(self) -> None:
+        self._auto_move_active = not self._auto_move_active
+        self.set_auto_move_active(self._auto_move_active)
+        self.auto_move_toggled.emit(self._auto_move_active)
 
-    def _on_toggle_auto_click(self) -> None:
-        self._auto_click_active = not self._auto_click_active
-        self.set_auto_click_active(self._auto_click_active)
-        self.auto_click_toggled.emit(self._auto_click_active)
-
-    def set_auto_click_active(self, active: bool) -> None:
-        self._auto_click_active = active
+    def set_auto_move_active(self, active: bool) -> None:
+        self._auto_move_active = active
         if active:
-            self.btn_auto_click.setText("🖱 Auto: ON")
-            self.btn_auto_click.setStyleSheet("""
+            self.btn_auto_move.setText("🖱 Auto Move: ON")
+            self.btn_auto_move.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(0, 255, 157, 0.20);
                     color: #00FF9D;
@@ -449,8 +440,8 @@ class AnalysisView(QWidget):
                 }
             """)
         else:
-            self.btn_auto_click.setText("🖱 Auto: OFF")
-            self.btn_auto_click.setStyleSheet("""
+            self.btn_auto_move.setText("🖱 Auto Move: OFF")
+            self.btn_auto_move.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(255, 255, 255, 0.05);
                     color: #94A3B8;
