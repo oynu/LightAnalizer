@@ -150,6 +150,22 @@ class AnalysisView(QWidget):
         self.btn_brilliant_mode.clicked.connect(self._on_toggle_brilliant_mode)
         ctrl_row.addWidget(self.btn_brilliant_mode)
 
+        self.lbl_brilliant_counter = QLabel("💎 0 !!")
+        self.lbl_brilliant_counter.setToolTip("Total brilliant moves (!!) farmed in this match")
+        self.lbl_brilliant_counter.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 240, 255, 0.08);
+                color: #00F0FF;
+                border: 1px solid rgba(0, 240, 255, 0.35);
+                border-radius: 8px;
+                padding: 5px 10px;
+                font-size: 11px;
+                font-weight: 800;
+                font-family: 'JetBrains Mono', 'Consolas', monospace;
+            }
+        """)
+        ctrl_row.addWidget(self.lbl_brilliant_counter)
+
         ctrl_row.addStretch()
         board_layout.addWidget(self.ctrl_row_widget)
 
@@ -353,8 +369,9 @@ class AnalysisView(QWidget):
 
     def set_brilliant_mode_active(self, active: bool) -> None:
         self._brilliant_mode_active = active
+        count = getattr(self.game_state_mgr, "brilliant_count", 0)
         if active:
-            self.btn_brilliant_mode.setText("💎 Brilliant: ON")
+            self.btn_brilliant_mode.setText(f"💎 Brilliant: ON ({count})")
             self.btn_brilliant_mode.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(0, 240, 255, 0.22);
@@ -503,6 +520,39 @@ class AnalysisView(QWidget):
 
         if hasattr(self.game_state_mgr, "brilliant_mode") and self.game_state_mgr.brilliant_mode != self._brilliant_mode_active:
             self.set_brilliant_mode_active(self.game_state_mgr.brilliant_mode)
+
+        # Update Brilliant Counter display
+        b_count = getattr(self.game_state_mgr, "brilliant_count", 0)
+        self.lbl_brilliant_counter.setText(f"💎 {b_count} !!")
+        if b_count > 0:
+            self.lbl_brilliant_counter.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(0, 255, 157, 0.20);
+                    color: #00FF9D;
+                    border: 1.5px solid #00FF9D;
+                    border-radius: 8px;
+                    padding: 5px 10px;
+                    font-size: 11px;
+                    font-weight: 900;
+                    font-family: 'JetBrains Mono', 'Consolas', monospace;
+                }
+            """)
+        else:
+            self.lbl_brilliant_counter.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(0, 240, 255, 0.08);
+                    color: #00F0FF;
+                    border: 1px solid rgba(0, 240, 255, 0.35);
+                    border-radius: 8px;
+                    padding: 5px 10px;
+                    font-size: 11px;
+                    font-weight: 800;
+                    font-family: 'JetBrains Mono', 'Consolas', monospace;
+                }
+            """)
+
+        if self._brilliant_mode_active:
+            self.btn_brilliant_mode.setText(f"💎 Brilliant: ON ({b_count})")
 
         if turn == chess.WHITE:
             turn_name = "WHITE TO MOVE"

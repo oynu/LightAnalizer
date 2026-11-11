@@ -38,6 +38,7 @@ class ScreenBoardOverlay(QWidget):
 
         self._white_at_bottom = True
         self._candidate_moves: List[CandidateMove] = []
+        self._brilliant_count = 0
         self._show_badge = True
         self._calibration: Optional[BoardCalibration] = None
 
@@ -105,6 +106,11 @@ class ScreenBoardOverlay(QWidget):
         self._candidate_moves = candidates
         self.update()
 
+    def set_brilliant_count(self, count: int) -> None:
+        """Updates the count of brilliant moves farmed in this match."""
+        self._brilliant_count = count
+        self.update()
+
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._apply_os_clickthrough_and_capture_exclusion()
@@ -140,6 +146,20 @@ class ScreenBoardOverlay(QWidget):
         painter.setPen(border_pen)
         painter.setBrush(Qt.NoBrush)
         painter.drawRoundedRect(QRectF(bx + 1, by + 1, b_size - 2, b_size - 2), 6, 6)
+
+        # On-screen match brilliant counter pill in top-right corner
+        if getattr(self, "_brilliant_count", 0) > 0:
+            pill_rect = QRectF(bx + b_size - 130, by + 6, 124, 24)
+            painter.save()
+            painter.setPen(QPen(QColor(0, 255, 157, 220), 1.4))
+            painter.setBrush(QBrush(QColor(10, 14, 24, 225)))
+            painter.drawRoundedRect(pill_rect, 12, 12)
+            font_cnt = QFont("JetBrains Mono", 9, QFont.Bold)
+            font_cnt.setStyleHint(QFont.Monospace)
+            painter.setFont(font_cnt)
+            painter.setPen(QColor("#00FF9D"))
+            painter.drawText(pill_rect, Qt.AlignCenter, f"💎 {self._brilliant_count} Farmed !!")
+            painter.restore()
 
         # Draw candidate move arrows in rank order (Rank 3, Rank 2, then Rank 1 on top)
         base_colors = [

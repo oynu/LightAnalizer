@@ -60,6 +60,8 @@ class GameStateManager(QObject):
         # Brilliant Farmer Mode
         self.brilliant_farmer = BrilliantFarmer()
         self._brilliant_mode = False
+        self._brilliant_count = 0
+        self._brilliant_history: List[Tuple[int, str]] = []
 
         # Mode: Live Tracking vs User Exploring Variation
         self._is_exploring_variation = False
@@ -104,8 +106,22 @@ class GameStateManager(QObject):
     def brilliant_mode(self) -> bool:
         return self._brilliant_mode
 
+    @property
+    def brilliant_count(self) -> int:
+        return self._brilliant_count
+
     def set_brilliant_mode(self, enabled: bool) -> None:
         self._brilliant_mode = enabled
+        # Boost MultiPV search depth to 6 when farming brilliance to unearth tactical sacrifices
+        if hasattr(self.engine_mgr, "config"):
+            self.engine_mgr.config.multipv = 6 if enabled else 3
+
+        # Re-request active position analysis with 6 lines
+        self._position_version += 1
+        curr_ver = self._position_version
+        active_b = self.board_state.board
+        self._request_analysis_for_position(active_b, curr_ver)
+
         if self._latest_candidates:
             if enabled:
                 self._latest_candidates = self.brilliant_farmer.process_candidates(
@@ -197,6 +213,21 @@ class GameStateManager(QObject):
         except Exception:
             move_san = move.uci()
 
+        # Check if the confirmed move was a brilliant move
+        was_brilliant = False
+        for c in self._latest_candidates:
+            if getattr(c, "is_brilliant", False) and c.move == move:
+                was_brilliant = True
+                break
+        if not was_brilliant:
+            is_sound, _ = self.brilliant_farmer.is_move_sound_sacrifice(self.board_state.board, move)
+            if is_sound:
+                was_brilliant = True
+
+        if was_brilliant:
+            self._brilliant_count += 1
+            self._brilliant_history.append((len(self._live_moves) + 1, move_san))
+
         self._live_board = new_board.copy()
         self._live_fen = self._live_board.fen()
         self._live_moves.append(move)
@@ -230,6 +261,8 @@ class GameStateManager(QObject):
         self._latest_summary = None
         self._confidence = 0.0
         self._position_version += 1
+        self._brilliant_count = 0
+        self._brilliant_history.clear()
         self.board_state.reset()
         self._live_board = chess.Board()
         self._live_fen = self._live_board.fen()
@@ -287,6 +320,9 @@ class GameStateManager(QObject):
             return False
 
         self.engine_mgr.cancel_analysis()
+        if self._brilliant_history and self._brilliant_history[-1][0] == len(self._live_moves):
+            self._brilliant_history.pop()
+            self._brilliant_count = max(0, self._brilliant_count - 1)
         self._live_moves.pop()
 
         root_board = self.board_state.game.board()
@@ -371,8 +407,22 @@ class GameStateManager(QObject):
 
     def user_played_analysis_move(self, move: chess.Move) -> bool:
         """User played an interactive move on the analysis board."""
+        was_brill = any(getattr(c, "is_brilliant", False) and c.move == move for c in self._latest_candidates)
+        if not was_brill:
+            is_sound, _ = self.brilliant_farmer.is_move_sound_sacrifice(self.board_state.board, move)
+            if is_sound:
+                was_brill = True
+
         success = self.board_state.push_move(move)
         if success:
+            if was_brill:
+                self._brilliant_count += 1
+                try:
+                    m_san = self.board_state.board.san(move)
+                except Exception:
+                    m_san = move.uci()
+                self._brilliant_history.append((len(self.board_state.moves), m_san))
+
             self._is_exploring_variation = True
             self._position_version += 1
             curr_ver = self._position_version

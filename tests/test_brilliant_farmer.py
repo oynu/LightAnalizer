@@ -135,23 +135,81 @@ def test_overwhelming_advantage_excludes_brilliance():
     is_brill, _ = farmer.evaluate_move_brilliance(board, bxh7, bxh7)
     assert is_brill is False
 
-def test_game_state_manager_brilliant_mode_toggle():
+def test_king_shelter_bxf7_sacrifice():
     """
-    Tests GameStateManager toggling and candidate updating under brilliant mode.
+    Tests king shelter destruction: Bishop sacrifice on f7 (Bxf7+).
+    """
+    farmer = BrilliantFarmer()
+    # Italian game position: Bc4, Nf3; black king on e8, pawn on f7
+    board = chess.Board("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 1 6")
+    bxf7 = CandidateMove(
+        move=chess.Move.from_uci("c4f7"),
+        san="Bxf7+",
+        rank=1,
+        score_cp=140,
+        eval_str="+1.4",
+        eval_diff=0.0
+    )
+    is_brill, reason = farmer.evaluate_move_brilliance(board, bxf7, bxf7)
+    assert is_brill is True
+    assert "King Shelter" in reason
+
+def test_en_prise_counter_attack_sacrifice():
+    """
+    Tests leaving a friendly piece en prise to deliver a counter-strike.
+    """
+    farmer = BrilliantFarmer()
+    # White Knight on c3 attacked by black pawn on b4; White plays d6! ignoring the knight
+    board = chess.Board("r1bqk2r/pppp1ppp/8/3Pp3/1p6/2N5/PPP2PPP/R1BQK2R w KQkq - 0 8")
+    d6 = CandidateMove(
+        move=chess.Move.from_uci("d5d6"),
+        san="d6",
+        rank=1,
+        score_cp=90,
+        eval_str="+0.9",
+        eval_diff=0.0
+    )
+    # Simulation: if knight on c3 is left en prise, it detects en prise sacrifice
+    is_sac, stype, sdesc = farmer._is_material_sacrifice(board, d6.move)
+    assert is_sac is True
+    assert "En Prise" in stype or "Counter-Intuitive" in stype
+
+def test_game_state_manager_brilliant_counter():
+    """
+    Tests that GameStateManager tracks brilliant moves and increments the brilliant counter.
     """
     board_state = BoardState()
     engine_mgr = EngineManager()
     analyzer = ChessAnalyzer()
     gsm = GameStateManager(board_state, engine_mgr, analyzer)
-    
-    assert gsm.brilliant_mode is False
-    
-    # Toggle on
-    active = gsm.toggle_brilliant_mode()
-    assert active is True
-    assert gsm.brilliant_mode is True
-    
-    # Toggle off
-    active = gsm.toggle_brilliant_mode()
-    assert active is False
-    assert gsm.brilliant_mode is False
+    gsm.set_brilliant_mode(True)
+    assert gsm.engine_mgr.config.multipv == 6
+    assert gsm.brilliant_count == 0
+
+    # Greek gift position
+    board = chess.Board("r1bq1rk1/ppp2ppp/2n1pn2/3p4/2PP4/3BPN2/PP1N1PPP/R2QK2R w KQ - 3 8")
+    gsm.board_state.reset(board.fen())
+
+    # Bxh7+ move
+    m = chess.Move.from_uci("d3h7")
+    bxh7 = CandidateMove(
+        move=m,
+        san="Bxh7+",
+        rank=1,
+        score_cp=180,
+        eval_str="+1.8",
+        eval_diff=0.0,
+        is_brilliant=True
+    )
+    gsm._latest_candidates = [bxh7]
+
+    # Confirm live move played
+    new_b = board.copy()
+    new_b.push(m)
+    gsm.confirm_live_move(m, new_b, 0.99)
+
+    assert gsm.brilliant_count == 1
+
+    # Reset for new game resets the counter
+    gsm.reset_for_new_game()
+    assert gsm.brilliant_count == 0

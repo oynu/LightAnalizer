@@ -869,6 +869,7 @@ class MainWindow(QMainWindow):
                 orient = orient()
             self.screen_overlay.set_white_at_bottom(bool(orient))
             self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+            self.screen_overlay.set_brilliant_count(getattr(self.game_state_mgr, "brilliant_count", 0))
 
     def toggle_screen_overlay(self) -> None:
         """
@@ -891,6 +892,7 @@ class MainWindow(QMainWindow):
             self.screen_overlay.update_calibration(cal)
             self.screen_overlay.set_white_at_bottom(bool(orient))
             self.screen_overlay.set_candidate_moves(self.game_state_mgr.candidates)
+            self.screen_overlay.set_brilliant_count(getattr(self.game_state_mgr, "brilliant_count", 0))
             self.screen_overlay.show()
             self.view_analysis.set_screen_hud_active(True)
 
