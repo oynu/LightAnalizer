@@ -53,28 +53,28 @@ class CandidateCard(QFrame):
         """)
 
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(14, 12, 14, 12)
-        self._layout.setSpacing(8)
+        self._layout.setContentsMargins(10, 6, 10, 6)
+        self._layout.setSpacing(3)
 
         # Top row: Rank badge, Move SAN, Eval badge, Delta badge
         top_row = QHBoxLayout()
-        top_row.setSpacing(8)
+        top_row.setSpacing(6)
 
         self.rank_badge = QLabel("#1")
         self.rank_badge.setStyleSheet("""
             background-color: rgba(255, 255, 255, 0.08);
             color: #94A3B8;
             border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 8px;
-            padding: 2px 7px;
-            font-size: 11px;
-            font-weight: 700;
+            border-radius: 6px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 800;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
         """)
 
         self.san_label = QLabel("--")
         self.san_label.setStyleSheet("""
-            font-size: 17px;
+            font-size: 15px;
             font-weight: 800;
             color: #F8FAFC;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -85,9 +85,9 @@ class CandidateCard(QFrame):
             background-color: rgba(0, 240, 255, 0.14);
             color: #00F0FF;
             border: 1px solid rgba(0, 240, 255, 0.32);
-            border-radius: 8px;
-            padding: 3px 9px;
-            font-size: 12px;
+            border-radius: 6px;
+            padding: 2px 7px;
+            font-size: 11px;
             font-weight: 700;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
         """)
@@ -95,7 +95,7 @@ class CandidateCard(QFrame):
         self.delta_label = QLabel("+0.00")
         self.delta_label.setStyleSheet("""
             color: #64748B;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
         """)
@@ -110,13 +110,14 @@ class CandidateCard(QFrame):
         # Middle: Natural language explanation
         self.explanation_label = QLabel("Awaiting engine calculation...")
         self.explanation_label.setWordWrap(True)
-        self.explanation_label.setStyleSheet("color: #CBD5E1; font-size: 12px; line-height: 1.4;")
+        self.explanation_label.setStyleSheet("color: #CBD5E1; font-size: 11px; line-height: 1.25;")
         self._layout.addWidget(self.explanation_label)
 
         # Strategic idea & response row
         self.idea_label = QLabel("")
         self.idea_label.setWordWrap(True)
-        self.idea_label.setStyleSheet("color: #94A3B8; font-size: 11px; font-style: italic;")
+        self.idea_label.setStyleSheet("color: #94A3B8; font-size: 10px; font-style: italic;")
+        self.idea_label.setVisible(False)
         self._layout.addWidget(self.idea_label)
 
         # Bottom row: Expand PV button & PV container
@@ -126,10 +127,11 @@ class CandidateCard(QFrame):
                 background: transparent;
                 border: none;
                 color: #00F0FF;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 600;
                 text-align: left;
-                padding: 2px 0px;
+                padding: 1px 0px;
+                margin: 0px;
             }
             QPushButton:hover {
                 color: #A855F7;
@@ -144,10 +146,10 @@ class CandidateCard(QFrame):
             background-color: rgba(10, 14, 24, 0.70);
             color: #00F0FF;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 6px 10px;
-            border-radius: 8px;
+            padding: 4px 8px;
+            border-radius: 6px;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
-            font-size: 11px;
+            font-size: 10px;
         """)
         self.pv_text.setVisible(False)
         self._layout.addWidget(self.pv_text)
@@ -163,7 +165,7 @@ class CandidateCard(QFrame):
                 QFrame#CandidateCard {
                     background-color: rgba(0, 240, 255, 0.06);
                     border: 1px solid rgba(0, 240, 255, 0.50);
-                    border-radius: 14px;
+                    border-radius: 12px;
                 }
             """)
             self.rank_badge.setText("BEST")
@@ -171,8 +173,8 @@ class CandidateCard(QFrame):
                 background-color: rgba(0, 255, 157, 0.16);
                 color: #00FF9D;
                 border: 1px solid rgba(0, 255, 157, 0.35);
-                border-radius: 8px;
-                padding: 2px 8px;
+                border-radius: 6px;
+                padding: 1px 6px;
                 font-size: 10px;
                 font-weight: 800;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -181,20 +183,20 @@ class CandidateCard(QFrame):
                 background-color: rgba(0, 240, 255, 0.18);
                 color: #00F0FF;
                 border: 1px solid rgba(0, 240, 255, 0.45);
-                border-radius: 8px;
-                padding: 3px 9px;
-                font-size: 12px;
+                border-radius: 6px;
+                padding: 2px 7px;
+                font-size: 11px;
                 font-weight: 800;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
             """)
             self.delta_label.setText("Top Choice")
-            self.delta_label.setStyleSheet("color: #00FF9D; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', 'Consolas', monospace;")
+            self.delta_label.setStyleSheet("color: #00FF9D; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', 'Consolas', monospace;")
         elif cand.rank == 2:
             self.setStyleSheet("""
                 QFrame#CandidateCard {
                     background-color: rgba(168, 85, 247, 0.05);
-                    border: 1px solid rgba(168, 85, 247, 0.35);
-                    border-radius: 14px;
+                    border: 1px solid rgba(168, 85, 247, 0.40);
+                    border-radius: 12px;
                 }
             """)
             self.rank_badge.setText("ALT")
@@ -202,8 +204,8 @@ class CandidateCard(QFrame):
                 background-color: rgba(168, 85, 247, 0.18);
                 color: #C084FC;
                 border: 1px solid rgba(168, 85, 247, 0.35);
-                border-radius: 8px;
-                padding: 2px 8px;
+                border-radius: 6px;
+                padding: 1px 6px;
                 font-size: 10px;
                 font-weight: 800;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -212,45 +214,45 @@ class CandidateCard(QFrame):
                 background-color: rgba(168, 85, 247, 0.15);
                 color: #D8B4FE;
                 border: 1px solid rgba(168, 85, 247, 0.30);
-                border-radius: 8px;
-                padding: 3px 9px;
-                font-size: 12px;
+                border-radius: 6px;
+                padding: 2px 7px;
+                font-size: 11px;
                 font-weight: 700;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
             """)
             self.delta_label.setText(f"{cand.eval_diff:+.2f} cp" if cand.eval_diff is not None else "")
-            self.delta_label.setStyleSheet("color: #C084FC; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
+            self.delta_label.setStyleSheet("color: #C084FC; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
         else:
             self.setStyleSheet("""
                 QFrame#CandidateCard {
-                    background-color: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.10);
-                    border-radius: 14px;
+                    background-color: rgba(255, 184, 0, 0.05);
+                    border: 1px solid rgba(255, 184, 0, 0.40);
+                    border-radius: 12px;
                 }
             """)
             self.rank_badge.setText("#3")
             self.rank_badge.setStyleSheet("""
-                background-color: rgba(255, 184, 0, 0.14);
+                background-color: rgba(255, 184, 0, 0.18);
                 color: #FFB800;
-                border: 1px solid rgba(255, 184, 0, 0.30);
-                border-radius: 8px;
-                padding: 2px 8px;
+                border: 1px solid rgba(255, 184, 0, 0.35);
+                border-radius: 6px;
+                padding: 1px 6px;
                 font-size: 10px;
                 font-weight: 800;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
             """)
             self.eval_badge.setStyleSheet("""
-                background-color: rgba(255, 255, 255, 0.07);
-                color: #94A3B8;
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 8px;
-                padding: 3px 9px;
-                font-size: 12px;
+                background-color: rgba(255, 184, 0, 0.14);
+                color: #FFB800;
+                border: 1px solid rgba(255, 184, 0, 0.30);
+                border-radius: 6px;
+                padding: 2px 7px;
+                font-size: 11px;
                 font-weight: 700;
                 font-family: 'JetBrains Mono', 'Consolas', monospace;
             """)
             self.delta_label.setText(f"{cand.eval_diff:+.2f} cp" if cand.eval_diff is not None else "")
-            self.delta_label.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
+            self.delta_label.setStyleSheet("color: #FFB800; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
 
         self.explanation_label.setText(cand.short_explanation or "Engine evaluated candidate continuation.")
         
@@ -260,6 +262,7 @@ class CandidateCard(QFrame):
         if cand.risks_and_responses:
             details.append(f"Response: {cand.risks_and_responses}")
         self.idea_label.setText(" | ".join(details) if details else "")
+        self.idea_label.setVisible(bool(details))
 
         # Format PV string
         if cand.pv_san:

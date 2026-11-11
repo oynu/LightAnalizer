@@ -223,14 +223,15 @@ class AnalysisView(QWidget):
 
             if show_mini_board:
                 self.board_container.setVisible(True)
-                self.board_widget.setMaximumSize(220, 220)
-                self.board_widget.setMinimumSize(140, 140)
+                self.board_widget.setMaximumSize(185, 185)
+                self.board_widget.setMinimumSize(120, 120)
             else:
                 self.board_container.setVisible(False)
 
             self.main_layout.setContentsMargins(6, 4, 6, 4)
-            self.main_layout.setSpacing(6)
-            self.analysis_layout.setContentsMargins(6, 4, 6, 4)
+            self.main_layout.setSpacing(4)
+            self.analysis_layout.setContentsMargins(4, 4, 4, 4)
+            self.analysis_layout.setSpacing(6)
         else:
             self.main_layout.setDirection(QBoxLayout.LeftToRight)
             self.board_container.setVisible(True)

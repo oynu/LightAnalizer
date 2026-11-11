@@ -37,15 +37,15 @@ COLORS = {
     "accent_amber": "#FFB800",
     "accent_ruby": "#FF2A85",
 
-    # Board squares
-    "board_light": "#FFFFFF26",
-    "board_dark": "#0F172AA5",
-    "board_highlight": "#00F0FF50",
-    "board_last_move": "#A855F74D",
-    "board_arrow_best": "#00F0FFD0",
-    "board_arrow_cand2": "#A855F7D0",
-    "board_arrow_cand3": "#00FF9DD0",
-    "board_arrow_threat": "#FF2A85D0",
+    # Board squares - High-contrast crystal clear visibility
+    "board_light": "#EBECD0",
+    "board_dark": "#779956",
+    "board_highlight": "#00F0FF80",
+    "board_last_move": "#A855F760",
+    "board_arrow_best": "#00F0FF",
+    "board_arrow_cand2": "#A855F7",
+    "board_arrow_cand3": "#FFB800",
+    "board_arrow_threat": "#FF2A85",
 }
 
 LIQUID_GLASS_STYLESHEET = """

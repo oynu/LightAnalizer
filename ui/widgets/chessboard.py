@@ -181,13 +181,13 @@ class ChessboardWidget(QWidget):
         board_clip.addRoundedRect(board_rect, 12, 12)
         painter.setClipPath(board_clip)
 
-        # 2. Draw Squares - Frosted glass light squares and smoked indigo dark squares
-        light_color = QColor(255, 255, 255, 38)
-        dark_color = QColor(15, 23, 42, 165)
-        last_move_fill = QColor(168, 85, 247, 75)
-        last_move_border = QColor(168, 85, 247, 180)
-        selected_fill = QColor(0, 240, 255, 80)
-        selected_border = QColor(0, 240, 255, 180)
+        # 2. Draw Squares - High-contrast crystal clear ivory cream and rich green
+        light_color = QColor("#EBECD0")
+        dark_color = QColor("#779956")
+        last_move_fill = QColor(168, 85, 247, 95)
+        last_move_border = QColor(168, 85, 247, 230)
+        selected_fill = QColor(0, 240, 255, 95)
+        selected_border = QColor(0, 240, 255, 230)
 
         for col in range(8):
             for row in range(8):
@@ -294,9 +294,9 @@ class ChessboardWidget(QWidget):
         # 6. Draw Candidate Move Arrows
         if self._show_arrows and self._candidate_moves:
             base_colors = [
-                QColor("#00F0FF"),   # 1st: Neon Cyan
+                QColor("#00F0FF"),   # 1st: Electric Cyan
                 QColor("#A855F7"),   # 2nd: Neon Violet
-                QColor("#00FF9D")    # 3rd: Neon Emerald
+                QColor("#FFB800")    # 3rd: Neon Amber
             ]
             for idx, cand in enumerate(self._candidate_moves[:3]):
                 rank = idx + 1
@@ -308,13 +308,13 @@ class ChessboardWidget(QWidget):
                     color.setAlpha(255)
                     scale = 1.35
                 elif has_hover:
-                    color.setAlpha(65)
+                    color.setAlpha(120)
                     scale = 0.85
                 else:
-                    color.setAlpha(220)
-                    scale = 1.0
+                    color.setAlpha(235)
+                    scale = 1.05
 
-                self._draw_arrow(painter, cand.move.from_square, cand.move.to_square, bx, by, sq_size, color, scale_mult=scale, glow=is_hovered)
+                self._draw_arrow(painter, cand.move.from_square, cand.move.to_square, bx, by, sq_size, color, scale_mult=scale, glow=True)
 
         # 7. Draw Threat Arrows - Neon Rose
         if self._show_arrows and self._threat_arrows:
@@ -345,20 +345,20 @@ class ChessboardWidget(QWidget):
         y2 = by + (r2 * sq_size) + (sq_size / 2.0)
 
         angle = math.atan2(y2 - y1, x2 - x1)
-        shaft_width = max(3.5, sq_size * 0.10) * scale_mult
-        head_length = sq_size * 0.32 * scale_mult
-        head_width = sq_size * 0.30 * scale_mult
+        shaft_width = max(4.0, sq_size * 0.12) * scale_mult
+        head_length = sq_size * 0.36 * scale_mult
+        head_width = sq_size * 0.34 * scale_mult
 
         # Shorten destination slightly so tip centers cleanly on destination square
-        tip_x = x2 - math.cos(angle) * (sq_size * 0.15)
-        tip_y = y2 - math.sin(angle) * (sq_size * 0.15)
+        tip_x = x2 - math.cos(angle) * (sq_size * 0.12)
+        tip_y = y2 - math.sin(angle) * (sq_size * 0.12)
 
         base_x = tip_x - math.cos(angle) * head_length
         base_y = tip_y - math.sin(angle) * head_length
 
         painter.save()
 
-        glow_alpha = 95 if glow else 55
+        glow_alpha = 110 if glow else 60
         glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), shaft_width + 6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         painter.setPen(glow_pen)
         painter.drawLine(QPointF(x1, y1), QPointF(base_x, base_y))
@@ -380,8 +380,9 @@ class ChessboardWidget(QWidget):
         ])
         
         # Glow pass for arrow head
+        glow_head_pen = QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), 3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), glow_alpha)))
-        painter.setPen(QPen(QColor(color.red(), color.green(), color.blue(), glow_alpha), 3, Qt.SolidLine, Qt.RoundJoin))
+        painter.setPen(glow_head_pen)
         painter.drawPolygon(arrow_head)
 
         # Core arrow head

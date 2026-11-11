@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         self._always_on_top = False
         self._show_mini_board = True
         self._saved_full_size = (900, 640)
-        self.resize(390, 620)
+        self.resize(380, 680)
         self.setMinimumSize(280, 360)
 
         self._active_overlay: Optional[BoardSelectionOverlay] = None
@@ -629,7 +629,7 @@ class MainWindow(QMainWindow):
                 }
             """)
             if self._is_compact_mode:
-                self.resize(380, 620)
+                self.resize(380, 680)
         else:
             self.btn_board_toggle.setText("♟ Board: OFF")
             self.btn_board_toggle.setStyleSheet("""
@@ -689,7 +689,7 @@ class MainWindow(QMainWindow):
                 }
             """)
             if self._show_mini_board:
-                self.resize(380, 620)
+                self.resize(380, 680)
             else:
                 self.resize(370, 420)
         else:
