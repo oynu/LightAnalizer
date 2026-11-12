@@ -14,7 +14,9 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QPolygonF, QPainterPath
 )
-from PySide6.QtCore import Qt, QPointF, QRectF, QRect
+from PySide6.QtCore import Qt, QPointF, QRectF, QRect, QTimer
+import time
+from ui.widgets.neon_fx import draw_premium_arrow, draw_sniper_scope, draw_glass_pill
 from core.types import CandidateMove, BoardCalibration
 
 
@@ -41,6 +43,13 @@ class ScreenBoardOverlay(QWidget):
         self._brilliant_count = 0
         self._show_badge = True
         self._calibration: Optional[BoardCalibration] = None
+
+        # Gentle 25fps animation clock for the sniper scopes (only runs while moves are shown)
+        self._fx_phase = 0.0
+        self._fx_t0 = time.monotonic()
+        self._fx_timer = QTimer(self)
+        self._fx_timer.setInterval(40)
+        self._fx_timer.timeout.connect(self._tick_fx)
 
         self._apply_os_clickthrough_and_capture_exclusion()
 
@@ -101,9 +110,20 @@ class ScreenBoardOverlay(QWidget):
             self._white_at_bottom = white_bottom
             self.update()
 
+    def _tick_fx(self) -> None:
+        self._fx_phase = time.monotonic() - self._fx_t0
+        if self._candidate_moves and self.isVisible():
+            self.update()
+
+    def hideEvent(self, event) -> None:
+        self._fx_timer.stop()
+        super().hideEvent(event)
+
     def set_candidate_moves(self, candidates: List[CandidateMove]) -> None:
         """Updates the candidate moves to display on screen."""
         self._candidate_moves = candidates
+        if candidates and self.isVisible() and not self._fx_timer.isActive():
+            self._fx_timer.start()
         self.update()
 
     def set_brilliant_count(self, count: int) -> None:
@@ -114,6 +134,8 @@ class ScreenBoardOverlay(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._apply_os_clickthrough_and_capture_exclusion()
+        if self._candidate_moves:
+            self._fx_timer.start()
 
     def _square_to_coords(self, sq: chess.Square) -> Tuple[int, int]:
         file_idx = chess.square_file(sq)
@@ -141,55 +163,58 @@ class ScreenBoardOverlay(QWidget):
         bx = (w - b_size) / 2.0
         by = (h - b_size) / 2.0
 
-        # Subtle specular neon border around board perimeter
-        border_pen = QPen(QColor(0, 240, 255, 70), 1.5)
-        painter.setPen(border_pen)
+        # Whisper-thin neon frame hugging the board perimeter
         painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(QRectF(bx + 1, by + 1, b_size - 2, b_size - 2), 6, 6)
+        painter.setPen(QPen(QColor(0, 240, 255, 26), 4.0))
+        painter.drawRoundedRect(QRectF(bx + 2, by + 2, b_size - 4, b_size - 4), 8, 8)
+        painter.setPen(QPen(QColor(0, 240, 255, 78), 1.2))
+        painter.drawRoundedRect(QRectF(bx + 1.5, by + 1.5, b_size - 3, b_size - 3), 7, 7)
 
-        # On-screen match brilliant counter pill in top-right corner
+        # On-screen match brilliant counter - glass pill in the top-right corner
         if getattr(self, "_brilliant_count", 0) > 0:
-            pill_rect = QRectF(bx + b_size - 130, by + 6, 124, 24)
-            painter.save()
-            painter.setPen(QPen(QColor(0, 255, 157, 220), 1.4))
-            painter.setBrush(QBrush(QColor(10, 14, 24, 225)))
-            painter.drawRoundedRect(pill_rect, 12, 12)
+            pill_rect = QRectF(bx + b_size - 138, by + 8, 130, 26)
             font_cnt = QFont("JetBrains Mono", 9, QFont.Bold)
             font_cnt.setStyleHint(QFont.Monospace)
-            painter.setFont(font_cnt)
-            painter.setPen(QColor("#00FF9D"))
-            painter.drawText(pill_rect, Qt.AlignCenter, f"💎 {self._brilliant_count} Farmed !!")
-            painter.restore()
+            draw_glass_pill(
+                painter, pill_rect, QColor("#00FF9D"),
+                f"💎 {self._brilliant_count} Farmed !!", font_cnt, QColor("#00FF9D")
+            )
 
-        # Draw candidate move arrows in rank order (Rank 3, Rank 2, then Rank 1 on top)
-        base_colors = [
-            QColor("#00F0FF"),   # 1st: Electric Cyan
-            QColor("#A855F7"),   # 2nd: Neon Violet
-            QColor("#FFB800")    # 3rd: Neon Amber
-        ]
+        # Candidate moves: arrows (rank 3 -> 1 so the best sits on top), then sniper scopes on targets
+        base_colors = [QColor("#00F0FF"), QColor("#A855F7"), QColor("#FFB800")]
+        scope_scales = [1.0, 0.86, 0.74]
 
         cands = self._candidate_moves[:3]
+        drawn = []
         for idx in reversed(range(len(cands))):
             cand = cands[idx]
-            if getattr(cand, "is_brilliant", False):
-                color = QColor("#00FF9D")
-            else:
-                color = base_colors[idx]
-            scale = 1.15 if idx == 0 else 0.95
+            color = QColor("#00FF9D") if getattr(cand, "is_brilliant", False) else base_colors[idx]
+            drawn.append((idx, cand, color))
             self._draw_neon_arrow(
                 painter,
                 cand.move.from_square,
                 cand.move.to_square,
                 bx, by, sq_size,
                 color,
-                scale_mult=scale,
+                scale_mult=1.12 if idx == 0 else 0.92,
                 rank=idx + 1
             )
 
-        # Draw move recommendation text badge for #1 best move
+        for idx, cand, color in drawn:
+            c2, r2 = self._square_to_coords(cand.move.to_square)
+            center = QPointF(bx + c2 * sq_size + sq_size / 2.0, by + r2 * sq_size + sq_size / 2.0)
+            draw_sniper_scope(
+                painter, center, sq_size, color,
+                phase=self._fx_phase + idx * 0.7,
+                scale=scope_scales[idx],
+                opacity=1.0 if idx == 0 else 0.85,
+                lock_on=(idx == 0),
+                spin_dir=1.0 if idx % 2 == 0 else -1.0
+            )
+
+        # Recommendation badge for the #1 move
         if self._show_badge and cands:
-            best = cands[0]
-            self._draw_best_move_badge(painter, best, bx, by, sq_size)
+            self._draw_best_move_badge(painter, cands[0], bx, by, sq_size)
 
         painter.end()
 
@@ -207,108 +232,13 @@ class ScreenBoardOverlay(QWidget):
     ) -> None:
         c1, r1 = self._square_to_coords(from_sq)
         c2, r2 = self._square_to_coords(to_sq)
-
-        x1 = bx + (c1 * sq_size) + (sq_size / 2.0)
-        y1 = by + (r1 * sq_size) + (sq_size / 2.0)
-        x2 = bx + (c2 * sq_size) + (sq_size / 2.0)
-        y2 = by + (r2 * sq_size) + (sq_size / 2.0)
-
-        angle = math.atan2(y2 - y1, x2 - x1)
-        shaft_width = max(5.0, sq_size * 0.13) * scale_mult
-        head_length = sq_size * 0.42 * scale_mult
-        head_width = sq_size * 0.40 * scale_mult
-
-        # Arrowhead positions
-        tip_x = x2 - math.cos(angle) * (sq_size * 0.10)
-        tip_y = y2 - math.sin(angle) * (sq_size * 0.10)
-        base_x = tip_x - math.cos(angle) * head_length
-        base_y = tip_y - math.sin(angle) * head_length
-
-        start_x = x1 + math.cos(angle) * (sq_size * 0.12)
-        start_y = y1 + math.sin(angle) * (sq_size * 0.12)
-
-        # Aerodynamic swept-back chevron head
-        sweep = head_length * 0.28
-        left_x = base_x + math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
-        left_y = base_y - math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
-        right_x = base_x - math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
-        right_y = base_y + math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
-
-        arrow_head = QPolygonF([
-            QPointF(tip_x, tip_y),
-            QPointF(left_x, left_y),
-            QPointF(base_x, base_y),
-            QPointF(right_x, right_y)
-        ])
-
-        painter.save()
-
-        # 1. Origin square glowing node
-        r_outer = shaft_width * 1.5
-        r_inner = shaft_width * 0.75
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 60)))
-        painter.drawEllipse(QPointF(x1, y1), r_outer, r_outer)
-        painter.setBrush(QBrush(color))
-        painter.drawEllipse(QPointF(x1, y1), r_inner, r_inner)
-        painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
-        painter.drawEllipse(QPointF(x1, y1), r_inner * 0.4, r_inner * 0.4)
-
-        # 2. Shaft - Multi-layer neon beam
-        # Pass 1: Soft ambient bloom halo
-        bloom_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 45),
-            shaft_width + 12,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
+        p1 = QPointF(bx + c1 * sq_size + sq_size / 2.0, by + r1 * sq_size + sq_size / 2.0)
+        p2 = QPointF(bx + c2 * sq_size + sq_size / 2.0, by + r2 * sq_size + sq_size / 2.0)
+        scope_scale = (1.0, 0.86, 0.74)[max(0, min(2, rank - 1))]
+        draw_premium_arrow(
+            painter, p1, p2, sq_size, color,
+            scale=scale_mult, opacity=1.0, scope_scale=scope_scale
         )
-        painter.setPen(bloom_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 2: Radiant neon glow
-        glow_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 110),
-            shaft_width + 5,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(glow_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 3: Solid neon beam
-        core_pen = QPen(color, shaft_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setPen(core_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 4: Laser specular core
-        spec_pen = QPen(
-            QColor(255, 255, 255, 210),
-            max(1.5, shaft_width * 0.28),
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(spec_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # 3. Arrowhead
-        # Pass 1: Head ambient bloom
-        head_bloom_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 75),
-            5,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(head_bloom_pen)
-        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 85)))
-        painter.drawPolygon(arrow_head)
-
-        # Pass 2: Head core
-        painter.setPen(QPen(QColor(255, 255, 255, 140), 1.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        painter.setBrush(QBrush(color))
-        painter.drawPolygon(arrow_head)
-
-        # Pass 3: Specular chiseled ridge down tip
-        ridge_pen = QPen(QColor(255, 255, 255, 230), max(1.2, shaft_width * 0.22), Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(ridge_pen)
-        painter.drawLine(QPointF(tip_x, tip_y), QPointF(base_x, base_y))
-
-        painter.restore()
 
     def _draw_best_move_badge(
         self,
@@ -318,35 +248,21 @@ class ScreenBoardOverlay(QWidget):
         by: float,
         sq_size: float
     ) -> None:
-        """Renders an on-screen floating pill badge with the recommended SAN move & eval score."""
+        """Floating glass capsule with the recommended SAN move and eval, anchored above the scope."""
         c2, r2 = self._square_to_coords(cand.move.to_square)
         tx = bx + (c2 * sq_size) + (sq_size / 2.0)
         ty = by + (r2 * sq_size) + (sq_size / 2.0)
 
-        # Position badge just above or below target square
         is_brill = getattr(cand, "is_brilliant", False)
-        badge_w = max(115.0 if is_brill else 90.0, sq_size * (1.45 if is_brill else 1.25))
-        badge_h = 24.0
-        badge_x = tx - (badge_w / 2.0)
-        badge_y = ty - (sq_size * 0.55) - badge_h
+        badge_w = max(122.0 if is_brill else 96.0, sq_size * (1.55 if is_brill else 1.3))
+        badge_h = 26.0
+        badge_x = min(max(tx - (badge_w / 2.0), bx + 4), bx + sq_size * 8 - badge_w - 4)
+        badge_y = ty - (sq_size * 0.62) - badge_h
         if badge_y < by + 4:
-            badge_y = ty + (sq_size * 0.55)
+            badge_y = ty + (sq_size * 0.62)
 
-        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
-
-        painter.save()
-        # Glass pill backing
-        border_col = QColor(0, 255, 157, 230) if is_brill else QColor(0, 240, 255, 180)
-        painter.setPen(QPen(border_col, 1.4 if is_brill else 1.2))
-        painter.setBrush(QBrush(QColor(10, 14, 24, 225)))
-        painter.drawRoundedRect(badge_rect, 12, 12)
-
-        # Text: "💎 !!: Bxh7+ +2.4" or "★ Nf3 +0.4"
+        accent = QColor("#00FF9D") if is_brill else QColor("#00F0FF")
         font = QFont("JetBrains Mono", 10, QFont.Bold)
         font.setStyleHint(QFont.Monospace)
-        painter.setFont(font)
-
         text = f"💎 !! {cand.san}  {cand.eval_str}" if is_brill else f"★ {cand.san}  {cand.eval_str}"
-        painter.setPen(QColor("#00FF9D") if is_brill else QColor("#00F0FF"))
-        painter.drawText(badge_rect, Qt.AlignCenter, text)
-        painter.restore()
+        draw_glass_pill(painter, QRectF(badge_x, badge_y, badge_w, badge_h), accent, text, font, accent)

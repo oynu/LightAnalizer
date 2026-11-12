@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Optional
 from PySide6.QtWidgets import QWidget
-from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPainterPath, QPen
+from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPainterPath, QPen, QBrush
 from PySide6.QtCore import Qt, QRectF, QPointF
 
 class EvalBarWidget(QWidget):
@@ -94,10 +94,16 @@ class EvalBarWidget(QWidget):
             painter.fillRect(black_rect, black_grad)
             painter.fillRect(white_rect, obsidian_color)
 
-        # Glowing divider line at the evaluation split
-        split_pen_glow = QPen(QColor(0, 240, 255, 140), 3.0)
-        painter.setPen(split_pen_glow)
-        painter.drawLine(QPointF(0, split_y), QPointF(w, split_y))
+        # Subtle graduation ticks (25 / 50 / 75 %)
+        painter.setPen(QPen(QColor(255, 255, 255, 38), 1.0))
+        for frac in (0.25, 0.5, 0.75):
+            ty = h * frac
+            painter.drawLine(QPointF(w * 0.62, ty), QPointF(w, ty))
+
+        # Glowing divider line at the evaluation split (soft bloom + bright core)
+        for width, alpha in ((9.0, 26), (5.5, 60), (3.0, 140)):
+            painter.setPen(QPen(QColor(0, 240, 255, alpha), width))
+            painter.drawLine(QPointF(0, split_y), QPointF(w, split_y))
 
         split_pen_core = QPen(QColor(255, 255, 255, 230), 1.2)
         painter.setPen(split_pen_core)
@@ -131,11 +137,20 @@ class EvalBarWidget(QWidget):
 
         painter.drawText(text_rect, Qt.AlignCenter, self._eval_str)
 
+        # Glass sheen: bright vertical highlight on the left edge + soft top gloss
+        sheen = QLinearGradient(0, 0, w, 0)
+        sheen.setColorAt(0.0, QColor(255, 255, 255, 70))
+        sheen.setColorAt(0.35, QColor(255, 255, 255, 14))
+        sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(bar_rect, QBrush(sheen))
         painter.restore()
 
-        # Specular 1px glass border
-        specular_pen = QPen(QColor(255, 255, 255, 45), 1.0)
-        painter.setPen(specular_pen)
+        # Specular glass rim (bright top-left, fading bottom-right)
+        rim = QLinearGradient(0, 0, w, h)
+        rim.setColorAt(0.0, QColor(255, 255, 255, 140))
+        rim.setColorAt(0.5, QColor(0, 240, 255, 50))
+        rim.setColorAt(1.0, QColor(168, 85, 247, 80))
+        painter.setPen(QPen(QBrush(rim), 1.2))
         painter.setBrush(Qt.NoBrush)
         painter.drawRoundedRect(bar_rect, 8.0, 8.0)
 

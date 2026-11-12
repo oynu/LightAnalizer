@@ -33,6 +33,7 @@ from ui.views.games_view import GamesView
 from ui.views.settings_view import SettingsView
 from ui.widgets.diagnostics_panel import DiagnosticsPanel
 from ui.widgets.screen_hud import ScreenBoardOverlay
+from ui.widgets.neon_fx import AuroraBackground
 
 class MainWindow(QMainWindow):
     """
@@ -112,7 +113,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self) -> None:
         self.setStyleSheet(DARK_THEME_QSS)
 
-        central_widget = QWidget()
+        central_widget = AuroraBackground()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)

@@ -309,6 +309,19 @@ QTableWidget, QListWidget, QTreeWidget, QScrollArea {
     outline: none;
 }
 
+/* Scroll viewports stay transparent so the aurora + glass cards show through */
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
+
+QToolTip {
+    background-color: rgba(13, 18, 30, 245);
+    color: #F8FAFC;
+    border: 1px solid rgba(0, 240, 255, 110);
+    border-radius: 8px;
+    padding: 5px 9px;
+}
+
 QHeaderView::section {
     background-color: rgba(255, 255, 255, 14);
     color: #94A3B8;

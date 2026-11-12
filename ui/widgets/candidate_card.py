@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QWidget
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QRectF
+from PySide6.QtGui import QPainter, QColor
+from ui.widgets.neon_fx import paint_glass_card
 from core.types import CandidateMove
 
 class CandidateCard(QFrame):
@@ -24,16 +26,23 @@ class CandidateCard(QFrame):
         self._candidate: Optional[CandidateMove] = None
         self._is_expanded = False
         self._on_pv_click: Optional[Callable[[CandidateMove], None]] = None
+        self._accent: Optional[QColor] = None
+        self._glow = False
+        self._hover = False
         self.setCursor(Qt.PointingHandCursor)
         self._setup_ui()
 
     def enterEvent(self, event) -> None:
         super().enterEvent(event)
+        self._hover = True
+        self.update()
         if self._candidate:
             self.card_hovered.emit(self._candidate.rank)
 
     def leaveEvent(self, event) -> None:
         super().leaveEvent(event)
+        self._hover = False
+        self.update()
         self.card_hovered.emit(-1)
 
     def mousePressEvent(self, event) -> None:
@@ -44,13 +53,7 @@ class CandidateCard(QFrame):
     def _setup_ui(self) -> None:
         self.setObjectName("CandidateCard")
         self.setFrameShape(QFrame.StyledPanel)
-        self.setStyleSheet("""
-            QFrame#CandidateCard {
-                background-color: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 14px;
-            }
-        """)
+        self.setStyleSheet("QFrame#CandidateCard { background: transparent; border: none; }")
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(10, 6, 10, 6)
@@ -161,13 +164,7 @@ class CandidateCard(QFrame):
 
         # Style based on rank with Liquid Glass + Neon styling
         if getattr(cand, "is_brilliant", False):
-            self.setStyleSheet("""
-                QFrame#CandidateCard {
-                    background-color: rgba(0, 240, 255, 0.12);
-                    border: 1.5px solid #00F0FF;
-                    border-radius: 12px;
-                }
-            """)
+            self._accent, self._glow = QColor('#00FF9D'), True
             self.rank_badge.setText("!! BRILLIANT")
             self.rank_badge.setStyleSheet("""
                 background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00F0FF, stop:1 #00FF9D);
@@ -192,13 +189,7 @@ class CandidateCard(QFrame):
             self.delta_label.setText("Sacrifice !!")
             self.delta_label.setStyleSheet("color: #00FF9D; font-size: 10px; font-weight: 800; font-family: 'JetBrains Mono', 'Consolas', monospace;")
         elif cand.rank == 1:
-            self.setStyleSheet("""
-                QFrame#CandidateCard {
-                    background-color: rgba(0, 240, 255, 0.06);
-                    border: 1px solid rgba(0, 240, 255, 0.50);
-                    border-radius: 12px;
-                }
-            """)
+            self._accent, self._glow = QColor('#00F0FF'), True
             self.rank_badge.setText("BEST")
             self.rank_badge.setStyleSheet("""
                 background-color: rgba(0, 255, 157, 0.16);
@@ -223,13 +214,7 @@ class CandidateCard(QFrame):
             self.delta_label.setText("Top Choice")
             self.delta_label.setStyleSheet("color: #00FF9D; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', 'Consolas', monospace;")
         elif cand.rank == 2:
-            self.setStyleSheet("""
-                QFrame#CandidateCard {
-                    background-color: rgba(168, 85, 247, 0.05);
-                    border: 1px solid rgba(168, 85, 247, 0.40);
-                    border-radius: 12px;
-                }
-            """)
+            self._accent, self._glow = QColor('#A855F7'), False
             self.rank_badge.setText("ALT")
             self.rank_badge.setStyleSheet("""
                 background-color: rgba(168, 85, 247, 0.18);
@@ -254,13 +239,7 @@ class CandidateCard(QFrame):
             self.delta_label.setText(f"{cand.eval_diff:+.2f} cp" if cand.eval_diff is not None else "")
             self.delta_label.setStyleSheet("color: #C084FC; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
         else:
-            self.setStyleSheet("""
-                QFrame#CandidateCard {
-                    background-color: rgba(255, 184, 0, 0.05);
-                    border: 1px solid rgba(255, 184, 0, 0.40);
-                    border-radius: 12px;
-                }
-            """)
+            self._accent, self._glow = QColor('#FFB800'), False
             self.rank_badge.setText("#3")
             self.rank_badge.setStyleSheet("""
                 background-color: rgba(255, 184, 0, 0.18);
@@ -285,6 +264,8 @@ class CandidateCard(QFrame):
             self.delta_label.setText(f"{cand.eval_diff:+.2f} cp" if cand.eval_diff is not None else "")
             self.delta_label.setStyleSheet("color: #FFB800; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', 'Consolas', monospace;")
 
+        self.update()
+
         if getattr(cand, "is_brilliant", False) and getattr(cand, "brilliant_reason", ""):
             self.explanation_label.setText(f"💎 {cand.brilliant_reason}")
         else:
@@ -304,6 +285,14 @@ class CandidateCard(QFrame):
             self.pv_btn.setVisible(True)
         else:
             self.pv_btn.setVisible(False)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        paint_glass_card(
+            painter, QRectF(self.rect()), 14.0, self._accent,
+            strength=1.25 if self._hover else 1.0, glow=self._glow
+        )
+        painter.end()
 
     def _toggle_pv(self) -> None:
         self._is_expanded = not self._is_expanded

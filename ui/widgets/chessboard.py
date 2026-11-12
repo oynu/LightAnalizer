@@ -10,11 +10,13 @@ import chess.svg
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QPolygonF,
-    QPainterPath
+    QPainterPath, QLinearGradient, QRadialGradient
 )
 from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray, QTimer
 from PySide6.QtSvg import QSvgRenderer
 from core.types import CandidateMove
+import time
+from ui.widgets.neon_fx import draw_premium_arrow, draw_sniper_scope, paint_aurora, rgba
 
 class ChessboardWidget(QWidget):
     """
@@ -44,6 +46,13 @@ class ChessboardWidget(QWidget):
         self._flash_timer.setInterval(25)
         self._flash_timer.timeout.connect(self._step_flash)
 
+        # Animation clock for the sniper scopes (runs only while candidate arrows are visible)
+        self._fx_phase = 0.0
+        self._fx_t0 = time.monotonic()
+        self._fx_timer = QTimer(self)
+        self._fx_timer.setInterval(40)
+        self._fx_timer.timeout.connect(self._tick_fx)
+
         self._piece_renderers: Dict[Tuple[chess.PieceType, chess.Color], QSvgRenderer] = {}
         self._init_piece_renderers()
 
@@ -72,8 +81,24 @@ class ChessboardWidget(QWidget):
         self._last_move = last_move
         self.update()
 
+    def _tick_fx(self) -> None:
+        self._fx_phase = time.monotonic() - self._fx_t0
+        if self._show_arrows and self._candidate_moves and self.isVisible():
+            self.update()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self._candidate_moves and not self._fx_timer.isActive():
+            self._fx_timer.start()
+
+    def hideEvent(self, event) -> None:
+        self._fx_timer.stop()
+        super().hideEvent(event)
+
     def set_candidate_moves(self, candidates: List[CandidateMove]) -> None:
         self._candidate_moves = candidates
+        if candidates and self.isVisible() and not self._fx_timer.isActive():
+            self._fx_timer.start()
         self.update()
 
     def set_highlighted_candidate_rank(self, rank: Optional[int]) -> None:
@@ -172,8 +197,12 @@ class ChessboardWidget(QWidget):
         bx, by, b_size, sq_size = self._get_board_geometry()
         board_rect = QRectF(bx, by, b_size, b_size)
 
-        # 1. Background board container - deep obsidian
-        painter.fillRect(self.rect(), QColor("#080B12"))
+        # 1. Background: obsidian aurora with a soft neon halo behind the board
+        paint_aurora(painter, QRectF(self.rect()))
+        for grow, alpha in ((22.0, 7), (14.0, 12), (7.0, 20)):
+            painter.setPen(QPen(QColor(0, 240, 255, alpha), grow))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(board_rect.adjusted(-2, -2, 2, 2), 14, 14)
 
         # Clip board squares to a sleek 12px squircle
         painter.save()
@@ -260,11 +289,25 @@ class ChessboardWidget(QWidget):
                     dot_radius = sq_size * 0.16
                     painter.drawEllipse(QPointF(cx, cy), dot_radius, dot_radius)
 
+        # Glass finish over the squares: diagonal gloss + soft edge vignette (keeps pieces fully legible)
+        gloss = QLinearGradient(board_rect.topLeft(), board_rect.bottomRight())
+        gloss.setColorAt(0.0, QColor(255, 255, 255, 38))
+        gloss.setColorAt(0.45, QColor(255, 255, 255, 6))
+        gloss.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(board_rect, QBrush(gloss))
+        vig = QRadialGradient(board_rect.center(), b_size * 0.75)
+        vig.setColorAt(0.60, QColor(0, 0, 0, 0))
+        vig.setColorAt(1.00, QColor(0, 6, 14, 70))
+        painter.fillRect(board_rect, QBrush(vig))
+
         painter.restore()
 
-        # Specular glass border outline around board container
-        specular_pen = QPen(QColor(255, 255, 255, 45), 1.5)
-        painter.setPen(specular_pen)
+        # Specular glass rim around the board container (bright top-left, fading bottom-right)
+        rim = QLinearGradient(board_rect.topLeft(), board_rect.bottomRight())
+        rim.setColorAt(0.0, QColor(255, 255, 255, 140))
+        rim.setColorAt(0.5, QColor(0, 240, 255, 60))
+        rim.setColorAt(1.0, QColor(168, 85, 247, 90))
+        painter.setPen(QPen(QBrush(rim), 1.6))
         painter.setBrush(Qt.NoBrush)
         painter.drawRoundedRect(board_rect, 12, 12)
 
@@ -291,36 +334,47 @@ class ChessboardWidget(QWidget):
                 y = by + (row * sq_size)
                 painter.drawText(QRectF(x, y, 16, sq_size), Qt.AlignCenter, r_txt)
 
-        # 6. Draw Candidate Move Arrows
+        # 6. Draw Candidate Move Arrows (rank 3 -> 1) then sniper scopes on the target squares
         if self._show_arrows and self._candidate_moves:
-            base_colors = [
-                QColor("#00F0FF"),   # 1st: Electric Cyan
-                QColor("#A855F7"),   # 2nd: Neon Violet
-                QColor("#FFB800")    # 3rd: Neon Amber
-            ]
-            for idx, cand in enumerate(self._candidate_moves[:3]):
+            base_colors = [QColor("#00F0FF"), QColor("#A855F7"), QColor("#FFB800")]
+            scope_scales = [1.0, 0.86, 0.74]
+            cands = self._candidate_moves[:3]
+            drawn = []
+            for idx in reversed(range(len(cands))):
+                cand = cands[idx]
                 rank = idx + 1
                 color = QColor(base_colors[idx])
                 is_hovered = (self._highlighted_candidate_rank == rank)
                 has_hover = (self._highlighted_candidate_rank is not None)
-
                 if is_hovered:
-                    color.setAlpha(255)
-                    scale = 1.35
+                    scale, opacity = 1.30, 1.0
                 elif has_hover:
-                    color.setAlpha(120)
-                    scale = 0.85
+                    scale, opacity = 0.85, 0.42
                 else:
-                    color.setAlpha(235)
-                    scale = 1.05
+                    scale, opacity = (1.10 if idx == 0 else 0.95), 1.0
+                drawn.append((idx, cand, color, opacity, is_hovered))
+                self._draw_arrow(painter, cand.move.from_square, cand.move.to_square, bx, by, sq_size,
+                                 color, scale_mult=scale, glow=True, opacity=opacity,
+                                 scope_scale=scope_scales[idx])
 
-                self._draw_arrow(painter, cand.move.from_square, cand.move.to_square, bx, by, sq_size, color, scale_mult=scale, glow=True)
+            for idx, cand, color, opacity, is_hovered in drawn:
+                c2, r2 = self._square_to_coords(cand.move.to_square)
+                center = QPointF(bx + c2 * sq_size + sq_size / 2.0, by + r2 * sq_size + sq_size / 2.0)
+                draw_sniper_scope(
+                    painter, center, sq_size, color,
+                    phase=self._fx_phase + idx * 0.7,
+                    scale=scope_scales[idx] * (1.12 if is_hovered else 1.0),
+                    opacity=opacity * (1.0 if idx == 0 else 0.88),
+                    lock_on=(idx == 0 or is_hovered),
+                    spin_dir=1.0 if idx % 2 == 0 else -1.0
+                )
 
-        # 7. Draw Threat Arrows - Neon Rose
+        # 7. Draw Threat Arrows - Neon Rose (no scope, short tip clearance)
         if self._show_arrows and self._threat_arrows:
-            threat_color = QColor(255, 42, 133, 220)
+            threat_color = QColor(255, 42, 133)
             for from_sq, to_sq in self._threat_arrows:
-                self._draw_arrow(painter, from_sq, to_sq, bx, by, sq_size, threat_color, glow=True)
+                self._draw_arrow(painter, from_sq, to_sq, bx, by, sq_size, threat_color,
+                                 glow=True, opacity=0.9, scope_scale=0.0)
 
         painter.end()
 
@@ -334,112 +388,16 @@ class ChessboardWidget(QWidget):
         sq_size: float,
         color: QColor,
         scale_mult: float = 1.0,
-        glow: bool = False
+        glow: bool = False,
+        opacity: float = 1.0,
+        scope_scale: float = 1.0
     ) -> None:
         c1, r1 = self._square_to_coords(from_sq)
         c2, r2 = self._square_to_coords(to_sq)
-
-        x1 = bx + (c1 * sq_size) + (sq_size / 2.0)
-        y1 = by + (r1 * sq_size) + (sq_size / 2.0)
-        x2 = bx + (c2 * sq_size) + (sq_size / 2.0)
-        y2 = by + (r2 * sq_size) + (sq_size / 2.0)
-
-        angle = math.atan2(y2 - y1, x2 - x1)
-        shaft_width = max(4.5, sq_size * 0.12) * scale_mult
-        head_length = sq_size * 0.40 * scale_mult
-        head_width = sq_size * 0.38 * scale_mult
-
-        # Arrowhead positions
-        tip_x = x2 - math.cos(angle) * (sq_size * 0.10)
-        tip_y = y2 - math.sin(angle) * (sq_size * 0.10)
-        base_x = tip_x - math.cos(angle) * head_length
-        base_y = tip_y - math.sin(angle) * head_length
-
-        start_x = x1 + math.cos(angle) * (sq_size * 0.12)
-        start_y = y1 + math.sin(angle) * (sq_size * 0.12)
-
-        # Aerodynamic swept-back chevron head
-        sweep = head_length * 0.28
-        left_x = base_x + math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
-        left_y = base_y - math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
-        right_x = base_x - math.sin(angle) * (head_width / 2.0) - math.cos(angle) * sweep
-        right_y = base_y + math.cos(angle) * (head_width / 2.0) - math.sin(angle) * sweep
-
-        arrow_head = QPolygonF([
-            QPointF(tip_x, tip_y),
-            QPointF(left_x, left_y),
-            QPointF(base_x, base_y),
-            QPointF(right_x, right_y)
-        ])
-
-        painter.save()
-
-        # 1. Origin square glowing node
-        r_outer = shaft_width * 1.4
-        r_inner = shaft_width * 0.70
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 60)))
-        painter.drawEllipse(QPointF(x1, y1), r_outer, r_outer)
-        painter.setBrush(QBrush(color))
-        painter.drawEllipse(QPointF(x1, y1), r_inner, r_inner)
-        painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
-        painter.drawEllipse(QPointF(x1, y1), r_inner * 0.4, r_inner * 0.4)
-
-        # 2. Shaft - Multi-layer neon laser beam
-        # Pass 1: Soft ambient bloom halo
-        bloom_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 45),
-            shaft_width + 10,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(bloom_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 2: Radiant neon glow
-        glow_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 110),
-            shaft_width + 4,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(glow_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 3: Solid neon beam
-        core_pen = QPen(color, shaft_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setPen(core_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # Pass 4: Laser specular core
-        spec_pen = QPen(
-            QColor(255, 255, 255, 210),
-            max(1.5, shaft_width * 0.28),
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(spec_pen)
-        painter.drawLine(QPointF(start_x, start_y), QPointF(base_x, base_y))
-
-        # 3. Arrowhead
-        # Pass 1: Head ambient bloom
-        head_bloom_pen = QPen(
-            QColor(color.red(), color.green(), color.blue(), 75),
-            5,
-            Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin
-        )
-        painter.setPen(head_bloom_pen)
-        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 85)))
-        painter.drawPolygon(arrow_head)
-
-        # Pass 2: Head core
-        painter.setPen(QPen(QColor(255, 255, 255, 140), 1.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        painter.setBrush(QBrush(color))
-        painter.drawPolygon(arrow_head)
-
-        # Pass 3: Specular chiseled ridge down tip
-        ridge_pen = QPen(QColor(255, 255, 255, 230), max(1.2, shaft_width * 0.22), Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(ridge_pen)
-        painter.drawLine(QPointF(tip_x, tip_y), QPointF(base_x, base_y))
-
-        painter.restore()
+        p1 = QPointF(bx + c1 * sq_size + sq_size / 2.0, by + r1 * sq_size + sq_size / 2.0)
+        p2 = QPointF(bx + c2 * sq_size + sq_size / 2.0, by + r2 * sq_size + sq_size / 2.0)
+        draw_premium_arrow(painter, p1, p2, sq_size, QColor(color.red(), color.green(), color.blue()),
+                           scale=scale_mult, opacity=opacity, scope_scale=scope_scale)
 
     def mousePressEvent(self, event) -> None:
         if event.button() != Qt.LeftButton:
